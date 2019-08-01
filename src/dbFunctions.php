@@ -1,6 +1,6 @@
 <?php
 
-namespace mmoriani\phplibs;
+namespace ottimis\phplibs;
 
 class Util	{
 

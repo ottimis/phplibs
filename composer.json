@@ -1,10 +1,10 @@
 {
-    "name": "mmoriani/phplibs",
+    "name": "ottimis/phplibs",
     "version": "1.0.0",
     "description": "Php Library",
     "autoload": {
         "psr-4": {
-            "mmoriani\\phplibs\\": "src"
+            "ottimis\\phplibs\\": "src"
         }
     }
 }
