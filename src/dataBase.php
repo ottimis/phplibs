@@ -20,9 +20,9 @@ namespace ottimis\phplibs;
 			$this->user = getenv('DB_USER');
 			$this->password = getenv('DB_PASSWORD');
 			$this->database = getenv('DB_NAME');
-			$this->port = getenv('DB_PORT');
+			$this->port = getenv('DB_PORT') ? getenv('DB_PORT') : 3306;
 
-			$this->conn = mysqli_connect( $this->$host, $this->$user, $this->$password, $this->$database, $this->$port );
+			$this->conn = mysqli_connect( $this->host, $this->user, $this->password, $this->database, $this->port );
 			$this->result = mysqli_query($this->conn, "SET character_set_results = 'utf8', character_set_client = 'utf8', character_set_connection = 'utf8', character_set_database = 'utf8', character_set_server = 'utf8'");
 			return $this->result;
 		}
