@@ -4,7 +4,7 @@
     "description": "Php Library",
     "autoload": {
         "psr-4": {
-            "phplibs\\utils\\": "src"
+            "mmoriani\\phplibs\\": "src"
         }
     }
 }
