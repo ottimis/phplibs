@@ -1,5 +1,6 @@
 {
     "name": "mmoriani/php-custom-libs",
+    "version": "0.0.1",
     "description": "Php Library",
     "require": {}
 }
