@@ -1,5 +1,10 @@
 {
     "name": "mmoriani/php-custom-libs",
     "version": "1.0.0",
-    "description": "Php Library"
+    "description": "Php Library",
+    "autoload": {
+        "psr-4": {
+            "phplibs\\": "src"
+        }
+    }
 }
