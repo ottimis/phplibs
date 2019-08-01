@@ -1,6 +1,6 @@
 <?php
 
-namespace phplibs\uuidGen;
+namespace phplibs\utils;
 
   class UUID {
     public static function v3($namespace, $name) {

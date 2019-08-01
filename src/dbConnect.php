@@ -1,6 +1,6 @@
 <?php
 
-namespace phplibs\Database;
+namespace phplibs\utils;
 
 class dataBase	{
 

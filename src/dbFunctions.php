@@ -1,6 +1,6 @@
 <?php
 
-namespace phplibs\Utils;
+namespace phplibs\utils;
 
 class Util	{
 
