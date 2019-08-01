@@ -1,5 +1,5 @@
 {
-    "name": "mmoriani/phplibs",
+    "name": "phplibs",
     "version": "1.0.0",
     "description": "Php Library",
     "autoload": {
