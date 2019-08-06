@@ -138,7 +138,7 @@ namespace ottimis\phplibs;
 			
 			//echo $sql;
 			
-			logme( $sql );
+			$this->logme( $sql );
 
 			$db = new dataBase();
 			$res = $db->query( $sql );
@@ -150,7 +150,7 @@ namespace ottimis\phplibs;
 			if( $ret_arr )
 				return $ar;
 			
-			outSend( $ar, 1, "" );
+			$this->outSend( $ar, 1, "" );
 		}
 	}
 ?>
