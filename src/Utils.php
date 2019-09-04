@@ -168,13 +168,19 @@ namespace ottimis\phplibs;
 					WHERE %s
 					ORDER BY %s
 					%s %s", $ar['select'], $ar['from'], $ar['join'], $ar['where'], $ar['order'], $ar['limit'], $ar['other']);
-            echo $sql;
-            $db->query($sql);
-            while ($rec = $db->fetchassoc()) {
-                $ret[] = $rec;
-            }
+			
+			if (isset($req['log']))
+				logme($sql);
+			$res = $db->query($sql);
+			if ($res)	{
+				while ($rec = $db->fetchassoc()) {
+					$ret[] = $rec;
+				}
+				return $ret;
+			} else {
+				return $db->error_get_last();
+			}
 
-            return $ret;
         }
 
 		function outSend( $data, $success, $error = "", $num_check = true ) {
