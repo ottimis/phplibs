@@ -2,7 +2,7 @@
 
 namespace ottimis\phplibs;
 
-	class utils	{
+	class Utils	{
 
 		function dbSql( $bInsert, $table, $ar, $idfield, $idvalue ) {
 
