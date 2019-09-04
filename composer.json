@@ -1,6 +1,6 @@
 {
     "name": "ottimis/phplibs",
-    "version": "1.0.6",
+    "version": "1.0.8",
     "description": "Php Library",
     "autoload": {
         "psr-4": {

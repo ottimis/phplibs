@@ -121,15 +121,18 @@ namespace ottimis\phplibs;
             foreach ($req as $key => $value) {
                 if (isset($req[$key])) {
                     switch ($key) {
-                        case 'where':
-                            foreach ($value as $v) {
-                                if (sizeof($v) == 2) {
-                                    $ar[$key] .= sprintf("%s='%s'", $v[0], $db->real_escape_string($v[1]));
-                                } else {
-                                    $ar[$key] .= sprintf("%s%s'%s'", $v[0], $v[1], $db->real_escape_string($v[2]));
-                                }
-                            }
-                            break;
+						case 'where':
+							foreach ($value as $v) {
+								if (!isset($v['operator'])) {
+									$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+								} else {
+									$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
+								}
+								if (isset($v['operatorAfter']))	{
+									$ar[$key] .= sprintf(" %s ",$v['operatorAfter']);
+								}
+							}
+							break;
                         case 'join':
                             foreach ($value as $v) {
                                 $ar[$key] .= sprintf("LEFT JOIN %s ON %s", $v[0], $v[1]);
