@@ -97,11 +97,13 @@ namespace ottimis\phplibs;
                         ]
                     ],
                     "where" => [
-                        [
-                            "email",
-                            "mattymatty95@gmail.com"
-                        ]
-                    ],
+						[
+							"field" => "email",
+							"operator" => "=",
+							"value" => "mattymatty95@gmail.com",
+							"operatorAfter" => "AND"
+						]
+					],
                     "order" => "uid",
                     "limit" => [0, 1]
                 );
