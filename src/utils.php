@@ -80,6 +80,98 @@ namespace ottimis\phplibs;
 
 		}
 
+		
+
+		/**
+         * dbSelect
+         *
+         * @param  mixed $req SELECT, FROM, JOIN(Array), WHERE(Array), ORDER, LIMIT, OTHER
+         *
+         * Example: $ar = array(
+                    "select" => ["uid", "status"],
+                    "from" => "pso_utenti pu",
+                    "join" => [
+                        [
+                            "pso_status ps",
+                            " ps.id=pu.idstatus"
+                        ]
+                    ],
+                    "where" => [
+                        [
+                            "email",
+                            "mattymatty95@gmail.com"
+                        ]
+                    ],
+                    "order" => "uid",
+                    "limit" => [0, 1]
+                );
+
+                print_r(dbSelect($ar));
+         *
+         * @return Array
+         */
+
+        function dbSelect($req)
+        {
+            $db = new dataBase();
+
+
+            foreach ($req as $key => $value) {
+                if (isset($req[$key])) {
+                    switch ($key) {
+                        case 'where':
+                            foreach ($value as $v) {
+                                if (sizeof($v) == 2) {
+                                    $ar[$key] .= sprintf("%s='%s'", $v[0], $db->real_escape_string($v[1]));
+                                } else {
+                                    $ar[$key] .= sprintf("%s%s'%s'", $v[0], $v[1], $db->real_escape_string($v[2]));
+                                }
+                            }
+                            break;
+                        case 'join':
+                            foreach ($value as $v) {
+                                $ar[$key] .= sprintf("LEFT JOIN %s ON %s", $v[0], $v[1]);
+                            }
+                            break;
+                        case 'limit':
+                            $ar[$key] .= sprintf("LIMIT %d, %d", $value[0], $value[1]);
+                            break;
+
+                        default:
+                            if (gettype($value) == 'array') {
+                                foreach ($value as $v) {
+                                    $ar[$key] .= $v .= ', ';
+                                }
+                                $ar[$key] = substr($ar[$key], 0, -2);
+                            } else {
+                                $ar[$key] = $value;
+                            }
+                            break;
+                    }
+                } else {
+                    $ar[$key] = '';
+                }
+            }
+            
+            if ($ar['order'] == '') {
+                $ar['order'] = (gettype($req['select']) == 'array') ? $req['select'][0] : $req['select'];
+            }
+
+            $sql = sprintf("SELECT %s
+					FROM %s
+					%s
+					WHERE %s
+					ORDER BY %s
+					%s %s", $ar['select'], $ar['from'], $ar['join'], $ar['where'], $ar['order'], $ar['limit'], $ar['other']);
+            echo $sql;
+            $db->query($sql);
+            while ($rec = $db->fetchassoc()) {
+                $ret[] = $rec;
+            }
+
+            return $ret;
+        }
+
 		function outSend( $data, $success, $error = "", $num_check = true ) {
 			$ret['success'] = $success;
 			if( $error != "" )
