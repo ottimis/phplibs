@@ -117,7 +117,6 @@ namespace ottimis\phplibs;
         {
             $db = new dataBase();
 
-
             foreach ($req as $key => $value) {
                 if (isset($req[$key])) {
                     switch ($key) {
@@ -162,23 +161,51 @@ namespace ottimis\phplibs;
                 $ar['order'] = (gettype($req['select']) == 'array') ? $req['select'][0] : $req['select'];
             }
 
-            $sql = sprintf("SELECT %s
-					FROM %s
-					%s
-					WHERE %s
-					ORDER BY %s
-					%s %s", $ar['select'], $ar['from'], $ar['join'], $ar['where'], $ar['order'], $ar['limit'], $ar['other']);
+            if (isset($req['select'])) {
+                $sql = sprintf(
+                    "SELECT %s %s
+						FROM %s
+						%s
+						%s
+						ORDER BY %s
+						%s %s",
+					isset($req['count']) ? "SQL_CALC_FOUND_ROWS " : '',
+                    $ar['select'],
+                    $ar['from'],
+                    $ar['join'],
+                    isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    $ar['order'],
+                    isset($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
+                    $ar['other']
+                );
+            }	else if(isset($req['delete']))	{
+				$sql = sprintf("DELETE
+						FROM %s
+						WHERE %s
+						%s",
+						$ar['from'],
+						isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+						$ar['other']);
+			}
 			
 			if (isset($req['log']))
 				logme($sql);
+
 			$res = $db->query($sql);
 			if ($res)	{
 				while ($rec = $db->fetchassoc()) {
-					$ret[] = $rec;
+					$ret['data'][] = $rec;
+				}
+				if ($req['count'])	{
+					$db->query("SELECT FOUND_ROWS()");
+					$ret['total'] = $db->fetcharray();
+					$ret['count'] = sizeof($ret['data']);
 				}
 				return $ret;
 			} else {
-				return $db->error_get_last();
+				logme("SQL --> " . $sql, true);
+				logme($db->error_get_last(), true);
+				return false;
 			}
 
         }
@@ -195,12 +222,15 @@ namespace ottimis\phplibs;
 		}
 
 		// funzioni log
-		function logme( $s ) {
+		function logme( $s, $berror = false ) {
 			
 			$dt = date( "Ymd", time() );
 			$tm = date( "H:i:s", time() );
 
-			$sFile = sprintf( "logs/%s.txt", $dt );
+			if (!$berror)
+				$sFile = sprintf( "logs/%s.txt", $dt );
+			else
+				$sFile = sprintf("logs/%s_error.txt", $dt);
 			file_put_contents( $sFile, $tm . " - " . $s . "\r\n", FILE_APPEND ); 
 		}
 
