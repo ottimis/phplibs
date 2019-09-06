@@ -30,7 +30,7 @@ use Firebase\JWT\JWT;
          *
          * @return void
          */
-        public function __construct($key, $funcField = '', $scopeField = '', $extraField = '', $scopeTable = '', $tokenTable = 'token', $tokenExpiration = '')
+        public function __construct($key, $funcField = '', $scopeField = '', $scopeTable = '', $extraField = '', $tokenTable = 'token', $tokenExpiration = '')
         {
             $this->tokenKey = $key;
             $this->funcField = $funcField;
@@ -51,7 +51,7 @@ use Firebase\JWT\JWT;
                 $res = $db->query($sql);
                 if ($res)   {
                     $rec = $db->fetchassoc();
-                    if ( array_search($idRole, json_encode($rec[$this->scopeField])) !== false) {
+                    if ( array_search($idRole, json_decode($rec[$this->scopeField])) !== false) {
                         return true;
                     }
                 }
@@ -121,7 +121,7 @@ use Firebase\JWT\JWT;
                     }
 
                     if (time() > $decoded['exp']) {
-                        return false;
+                        $utils->outSend(401);
                     } else {
                         unset($decoded['exp']);
                         if ($this->checkScopes($cmd, $decoded['idrole'], $extraField)) {
@@ -131,7 +131,7 @@ use Firebase\JWT\JWT;
                         }
                     }
                 } else {
-                    return false;
+                    $utils->outSend(401);
                 }
             } else {
                 return true;
@@ -150,6 +150,7 @@ use Firebase\JWT\JWT;
         {
             $time = $this->tokenExpiration != '' ? $this->tokenExpiration : time() + (60 * 60 * 24 * 10); 
             $data['exp'] = $time;
+            $data['idrole'] = $idRole;
             $jwt = JWT::encode($data, $this->tokenKey);
             
             $ar['token'] = $jwt;
