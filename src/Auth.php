@@ -8,6 +8,7 @@ use Firebase\JWT\JWT;
         protected $tokenKey = 'KEY_DEFAULT_Ott1m1s!&!';
         protected $funcField = '';
         protected $scopeField = '';
+        protected $extraField = '';
         protected $scopeTable = '';
         protected $tokenTable = '';
         protected $tokenExpiration = '';
@@ -29,42 +30,33 @@ use Firebase\JWT\JWT;
          *
          * @return void
          */
-        public function __construct($key, $funcField = '', $scopeField = '', $scopeTable = '', $tokenTable = 'token', $tokenExpiration = '')
+        public function __construct($key, $funcField = '', $scopeField = '', $extraField = '', $scopeTable = '', $tokenTable = 'token', $tokenExpiration = '')
         {
             $this->tokenKey = $key;
             $this->funcField = $funcField;
             $this->scopeField = $scopeField;
+            $this->extraField = $extraField;
             $this->scopeTable = $scopeTable;
             $this->tokenTable = $tokenTable;
             $this->tokenExpiration = $tokenExpiration;
         }
 
-        protected function getScopes()
+        protected function checkScopes($cmd, $idRole, $extra = '')
         {
             $db = new dataBase();
             if ($this->funcField != '' && $this->scopeField != '' && $this->scopeTable != '') {
-                $sql = sprintf("SELECT %s, %s FROM %s", $this->funcField, $this->scopeField, $this->scopeTable);
-                $db->query($sql);
-                while ($rec = $db->fetchassoc()) {
-                    $ar[$rec[$this->funcField]] = $rec[$this->scopeField];
+                $sql = sprintf("SELECT %s, %s, %s FROM %s WHERE %s='%s' AND %s='%s'", $this->funcField, $this->scopeField,
+                    $this->extraField, $this->scopeTable, $this->funcField, $db->real_escape_string($cmd),
+                    $this->extraField, $db->real_escape_string($extra));
+                $res = $db->query($sql);
+                if ($res)   {
+                    $rec = $db->fetchassoc();
+                    if ( array_search($idRole, json_encode($rec[$this->scopeField])) !== false) {
+                        return true;
+                    }
                 }
-                return $ar;
-            } else {
-                return false;
             }
-        }
-
-        protected function checkScopes($ar, $cmd, $idRole)
-        {
-            if (isset($ar[$cmd])) {
-                if ($ar[$cmd] <= $idRole) {
-                    return true;
-                } else {
-                    return false;
-                }
-            } else {
-                return true;
-            }
+            return false;
         }
 
         /**
@@ -113,7 +105,7 @@ use Firebase\JWT\JWT;
          *
          * @return void
          */
-        public function tokenCheck($cmd)
+        public function tokenCheck($cmd, $extraField = '')
         {
             if (array_search($cmd, $this->arWhiteList) === false) {
                 $utils = new Utils();
@@ -132,14 +124,10 @@ use Firebase\JWT\JWT;
                         return false;
                     } else {
                         unset($decoded['exp']);
-                        if ($ar = $this->getScopes()) {
-                            if ($this->checkScopes($ar, $cmd, $decoded['idrole'])) {
-                                return $decoded;
-                            } else {
-                                return false;
-                            }
+                        if ($this->checkScopes($cmd, $decoded['idrole'], $extraField)) {
+                            return $decoded;
                         } else {
-                            throw new Exception("Cannot retreive scopes information", 2);
+                            $utils->outSend(401);
                         }
                     }
                 } else {
