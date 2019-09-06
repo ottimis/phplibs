@@ -148,6 +148,7 @@ use Firebase\JWT\JWT;
          */
         public function tokenRefresh($idRole, $data)
         {
+            $utils = new Utils();
             $time = $this->tokenExpiration != '' ? $this->tokenExpiration : time() + (60 * 60 * 24 * 10); 
             $data['exp'] = $time;
             $data['idrole'] = $idRole;
@@ -155,7 +156,7 @@ use Firebase\JWT\JWT;
             
             $ar['token'] = $jwt;
             $ar['token_date'] = 'now()';
-            $ret = dbSql(true, $this->tokenTable, $ar, "", "");
+            $ret = $utils->dbSql(true, $this->tokenTable, $ar, "", "");
             return $jwt;
         }
 
