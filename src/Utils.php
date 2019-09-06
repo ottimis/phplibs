@@ -264,7 +264,7 @@ namespace ottimis\phplibs;
 				return $ret;
 			} else {
 				logme("SQL --> " . $sql, true);
-				logme($db->error_get_last(), true);
+				logme($db->error(), true);
 				$db->freeresult();
                 $db->close();
 				return false;
