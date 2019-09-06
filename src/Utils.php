@@ -285,5 +285,20 @@ namespace ottimis\phplibs;
 			
 			$this->outSend( $ar, 1, "" );
 		}
+
+		function getParams($debug = false)	{
+			$data = json_decode(file_get_contents("php://input"), true);
+			$req = $_POST;
+			$req = array_merge($req, $_GET);
+
+			if ($data != null) {
+				$req = array_merge($req, $data);
+			}
+			if ($debug)	{
+				$utils = new Utils();
+				$utils->logme("getParams --> " . json_encode($req));
+			}
+			return $req;
+		}
 	}
 ?>

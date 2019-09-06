@@ -7,32 +7,48 @@ use Firebase\JWT\JWT;
     {
         protected $tokenKey = 'KEY_DEFAULT_Ott1m1s!&!';
         protected $funcField = '';
-        protected $roleIdField = '';
-        protected $roleTable = '';
+        protected $scopeField = '';
+        protected $scopeTable = '';
         protected $tokenTable = '';
+        protected $tokenExpiration = '';
+        protected $arWhiteList = array();
         protected $scopes = array();
         /**
          * Example: ["_user_list" => 1, "_pazienti_list" => 2]
          */
 
-        public function __construct($key, $scopes, $funcField = '', $roleIdField = '', $roleTable = '', $tokenTable = 'token')
+        /**
+         * __construct
+         *
+         * @param  mixed $key
+         * @param  mixed $scopes
+         * @param  mixed $funcField
+         * @param  mixed $scopeField
+         * @param  mixed $scopeTable
+         * @param  mixed $tokenTable
+         *
+         * @return void
+         */
+        public function __construct($key, $funcField = '', $scopeField = '', $scopeTable = '', $tokenTable = 'token', $tokenExpiration = '')
         {
-            $this->$tokenKey = $key;
-            $this->$scopes = $scopes;
-            $this->$funcField = $funcField;
-            $this->$roleIdField = $roleIdField;
-            $this->$roleTable = $roleTable;
-            $this->$tokenTable = $tokenTable;
+            $this->tokenKey = $key;
+            $this->funcField = $funcField;
+            $this->scopeField = $scopeField;
+            $this->scopeTable = $scopeTable;
+            $this->tokenTable = $tokenTable;
+            $this->tokenExpiration = $tokenExpiration;
         }
 
         protected function getScopes()
         {
-            if ($this->$funcField != '' && $this->$roleIdField != '' && $this->$roleTable != '') {
-                $sql = sprintf("SELECT %s, %s FROM %s", $this->$funcField, $this->$roleIdField, $this->$roleTable);
+            $db = new dataBase();
+            if ($this->funcField != '' && $this->scopeField != '' && $this->scopeTable != '') {
+                $sql = sprintf("SELECT %s, %s FROM %s", $this->funcField, $this->scopeField, $this->scopeTable);
                 $db->query($sql);
                 while ($rec = $db->fetchassoc()) {
-                    $ar[$rec[$this->$funcField]] = $rec[$this->$roleIdField];
+                    $ar[$rec[$this->funcField]] = $rec[$this->scopeField];
                 }
+                return $ar;
             } else {
                 return false;
             }
@@ -77,7 +93,7 @@ use Firebase\JWT\JWT;
          * */
         protected function getBearerToken()
         {
-            $headers = getAuthorizationHeader();
+            $headers = $this->getAuthorizationHeader();
                 
             // HEADER: Get the access token from the header
             if (!empty($headers)) {
@@ -90,43 +106,72 @@ use Firebase\JWT\JWT;
 
 
 
+        /**
+         * tokenCheck
+         *
+         * @param  mixed $cmd
+         *
+         * @return void
+         */
         public function tokenCheck($cmd)
         {
-            $utils = new Utils();
-            $db = new dataBase();
+            if (array_search($cmd, $this->arWhiteList) === false) {
+                $utils = new Utils();
+                $db = new dataBase();
 
-            $token = getBearerToken();
+                $jwt = $this->getBearerToken();
 
-            try {
-                $decoded = (array) JWT::decode($jwt, $token_key, array('HS256'));
-            } catch (Exception $e) {
-                return 0;
-            }
+                if ($jwt) {
+                    try {
+                        $decoded = (array) JWT::decode($jwt, $this->tokenKey, array('HS256'));
+                    } catch (Exception $e) {
+                        return 0;
+                    }
 
-            if (time() > $decoded['exp']) {
-                return false;
-            } else {
-                unset($decoded['exp']);
-                if ($ar = getScopes()) {
-                    if (checkScope($ar, $cmd, $decoded['idrole'])) {
-                        return $decoded;
-                    } else {
+                    if (time() > $decoded['exp']) {
                         return false;
+                    } else {
+                        unset($decoded['exp']);
+                        if ($ar = $this->getScopes()) {
+                            if ($this->checkScopes($ar, $cmd, $decoded['idrole'])) {
+                                return $decoded;
+                            } else {
+                                return false;
+                            }
+                        } else {
+                            throw new Exception("Cannot retreive scopes information", 2);
+                        }
                     }
                 } else {
-                    throw new Exception("Cannot retreive scopes information", 2);
+                    return false;
                 }
+            } else {
+                return true;
             }
         }
 
+        /**
+         * tokenRefresh
+         *
+         * @param  mixed $idRole
+         * @param  mixed $data
+         *
+         * @return void
+         */
         public function tokenRefresh($idRole, $data)
         {
-            $data['exp'] = time() + (60 * 60 * 24 * 10);
-            $jwt = JWT::encode($data, $this->$tokenKey);
+            $time = $this->tokenExpiration != '' ? $this->tokenExpiration : time() + (60 * 60 * 24 * 10); 
+            $data['exp'] = $time;
+            $jwt = JWT::encode($data, $this->tokenKey);
             
             $ar['token'] = $jwt;
             $ar['token_date'] = 'now()';
-            $ret = dbSql(true, $this->$tokenTable, $ar, "", "");
+            $ret = dbSql(true, $this->tokenTable, $ar, "", "");
             return $jwt;
+        }
+
+        public function addToWhiteList($ar) {
+            array_merge($this->arWhiteList, $ar);
+            return true;
         }
     }
