@@ -179,14 +179,15 @@ namespace ottimis\phplibs;
                 if (isset($req[$key])) {
                     switch ($key) {
 						case 'where':
-							foreach ($value as $v) {
+							foreach ($value as $k->$v) {
 								if (!isset($v['operator'])) {
 									$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
 								} else {
 									$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
 								}
 								if (isset($v['operatorAfter']))	{
-									$ar[$key] .= sprintf(" %s ",$v['operatorAfter']);
+									if (isset($value[$key + 1]))
+										$ar[$key] .= sprintf(" %s ",$v['operatorAfter']);
 								}
 							}
 							break;
@@ -196,7 +197,7 @@ namespace ottimis\phplibs;
                             }
                             break;
                         case 'limit':
-                            $ar[$key] .= sprintf("LIMIT %d, %d", $value[0], $value[1]);
+                            $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
                             break;
 
                         default:
@@ -214,10 +215,6 @@ namespace ottimis\phplibs;
                     $ar[$key] = '';
                 }
             }
-            
-            if ($ar['order'] == '') {
-                $ar['order'] = (gettype($req['select']) == 'array') ? $req['select'][0] : $req['select'];
-            }
 
             if (isset($req['select'])) {
                 $sql = sprintf(
@@ -225,14 +222,14 @@ namespace ottimis\phplibs;
 						FROM %s
 						%s
 						%s
-						ORDER BY %s
+						%s
 						%s %s",
 					isset($req['count']) ? "SQL_CALC_FOUND_ROWS " : '',
                     $ar['select'],
                     $ar['from'],
                     $ar['join'],
                     isset($ar['where']) ? "WHERE " . $ar['where'] : '',
-                    $ar['order'],
+                    isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
                     isset($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
                     $ar['other']
                 );
@@ -251,17 +248,23 @@ namespace ottimis\phplibs;
 
 			$res = $db->query($sql);
 			if ($res)	{
+				$ret = array();
 				while ($rec = $db->fetchassoc()) {
 					$ret['data'][] = $rec;
 				}
 				if ($req['count'])	{
 					$db->query("SELECT FOUND_ROWS()");
-					$ret['total'] = $db->fetcharray();
-					$ret['count'] = sizeof($ret['data']);
+                    $ret['total'] = intval($db->fetcharray()[0]);
+                    $ret['count'] = sizeof($ret['data']);
+                    $ret['rows'] = $ret['data'];
+                    unset($ret['data']);
 				}
 				$db->freeresult();
                 $db->close();
-				return $ret;
+				if (sizeof($ret['data']) == 1)
+					return $ret['data'][0];
+				else
+					return $ret;
 			} else {
 				$this->logme("SQL --> " . $sql, true);
 				$this->logme($db->error(), true);
@@ -305,7 +308,7 @@ namespace ottimis\phplibs;
 			file_put_contents( $sFile, $tm . " - " . $s . "\r\n", FILE_APPEND ); 
 		}
 
-		function _combo_list( $req, $ret_arr = false, $where = "" ) {
+		function _combo_list( $req, $where = "", $log = false ) {
 			$table = $req['table'];
 			$value = $req['value'];
 			$text = $req['text'];
@@ -315,34 +318,18 @@ namespace ottimis\phplibs;
 			if( $where != "" )
 				$where = " WHERE " . $where;
 			
-			switch( $table ) {
-				case "aifa_province":
-					$sql = sprintf( "SELECT %s as id, %s as text, sigla
-							FROM %s
-							%s
-							ORDER BY %s",
-							$value,
-							$text,
-							$table,
-							$where,
-							$order );
-					break;
-				default:
-					$sql = sprintf( "SELECT %s as id, %s as text
-							FROM %s
-							%s
-							ORDER BY %s",
-							$value,
-							$text,
-							$table,
-							$where,
-							$order );
-					break;
-			}
+			$sql = sprintf( "SELECT %s as id, %s as text
+					FROM %s
+					%s
+					ORDER BY %s",
+					$value,
+					$text,
+					$table,
+					$where,
+					$order );
 			
-			//echo $sql;
-			
-			$this->logme( $sql );
+			if ($log)	
+				$this->logme( $sql );
 
 			$db = new dataBase();
 			$res = $db->query( $sql );
@@ -350,11 +337,7 @@ namespace ottimis\phplibs;
 			while( $rec = $db->fetchassoc() ) {
 				$ar[] = $rec;
 			}
-
-			if( $ret_arr )
-				return $ar;
-			
-			$this->outSend( $ar, 1, "" );
+			return $ar;
 		}
 
 		/**
