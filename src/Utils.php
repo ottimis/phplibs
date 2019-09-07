@@ -119,7 +119,7 @@ namespace ottimis\phplibs;
 				$r = $db->query( $sql );
 
 				if( !$r ) {
-					logme( "!!! Errore --> " . $db->error(), true );
+					$this->logme( "!!! Errore --> " . $db->error(), true );
 					$ret['success'] = 0;
 				} else {
 					$ret['id'] = $db->insert_id();
@@ -129,7 +129,7 @@ namespace ottimis\phplibs;
                 $db->close();
 				return $ret;
 			} catch( Exception $e ) {
-				logme("Eccezione db --> " . $e->getMessage(), true);
+				$this->logme("Eccezione db --> " . $e->getMessage(), true);
 				$ret['success'] = 0;
 				$db->freeresult();
                 $db->close();
@@ -247,7 +247,7 @@ namespace ottimis\phplibs;
 			}
 			
 			if (isset($req['log']))
-				logme($sql);
+				$this->logme($sql);
 
 			$res = $db->query($sql);
 			if ($res)	{
@@ -263,8 +263,8 @@ namespace ottimis\phplibs;
                 $db->close();
 				return $ret;
 			} else {
-				logme("SQL --> " . $sql, true);
-				logme($db->error(), true);
+				$this->logme("SQL --> " . $sql, true);
+				$this->logme($db->error(), true);
 				$db->freeresult();
                 $db->close();
 				return false;
@@ -373,8 +373,7 @@ namespace ottimis\phplibs;
 				$req = array_merge($req, $data);
 			}
 			if ($debug)	{
-				$utils = new Utils();
-				$utils->logme("getParams --> " . json_encode($req));
+				$this->logme("getParams --> " . json_encode($req));
 			}
 			return $req;
 		}
