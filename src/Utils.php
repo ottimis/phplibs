@@ -67,6 +67,7 @@ namespace ottimis\phplibs;
 		function dbSql( $bInsert, $table, $ar, $idfield, $idvalue ) {
 
 			$db = new dataBase();
+			$utils = new Utils();
 
 			try {
 				if( $bInsert ) {
@@ -193,7 +194,7 @@ namespace ottimis\phplibs;
 							break;
                         case 'join':
                             foreach ($value as $v) {
-                                $ar[$key] .= sprintf("LEFT JOIN %s ON %s", $v[0], $v[1]);
+                                $ar[$key] .= sprintf("LEFT JOIN %s ON %s \r", $v[0], $v[1]);
                             }
                             break;
                         case 'limit':
