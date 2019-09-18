@@ -117,7 +117,9 @@ use Firebase\JWT\JWT;
                     try {
                         $decoded = (array) JWT::decode($jwt, $this->tokenKey, array('HS256'));
                     } catch (Exception $e) {
-                        return 0;
+                        if ($_SERVER['REQUEST_METHOD'] !== 'OPTIONS')   {
+                            $utils->outSend(401);
+                        }
                     }
 
                     if (time() > $decoded['exp']) {
