@@ -180,7 +180,7 @@ namespace ottimis\phplibs;
                 if (isset($req[$key])) {
                     switch ($key) {
 						case 'where':
-							foreach ($value as $k->$v) {
+							foreach ($value as $v) {
 								if (!isset($v['operator'])) {
 									$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
 								} else {
