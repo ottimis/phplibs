@@ -64,7 +64,7 @@ namespace ottimis\phplibs;
 		);
 
 
-		function dbSql( $bInsert, $table, $ar, $idfield, $idvalue ) {
+		function dbSql( $bInsert, $table, $ar, $idfield, $idvalue, $noUpdate = false ) {
 
 			$db = new dataBase();
 			$utils = new Utils();
@@ -72,37 +72,25 @@ namespace ottimis\phplibs;
 			try {
 				if( $bInsert ) {
 					$columns = implode( ", ",array_keys($ar) );
-					//$escaped_values = array_map( 'mysql_real_escape_string', array_values($ar) );
-					//foreach( $ar as $k=>$v ) {
-
-					//$escaped_values = array_map(array($db, 'real_escape_string'), $row);
-					foreach( $ar as $k ) {
-						// logme( $k );
-						
+					foreach( $ar as $k ) {						
 						$values .= $values != '' ? "," : "";
 						if( $k != 'now()' )
 							$values .= "'" . $db->real_escape_string( $k ) . "'";
 						else
 							$values .= $db->real_escape_string( $k );
 					}
-
-
 					foreach( $ar as $k => $v ) {
-						//echo "<br>$k - $v";
 						$z .= $z != '' ? "," : "";
-						//logme( $k . ' - ' . $v );
 						if( $v !== "now()" )
 							$z .= $k . "='" . $db->real_escape_string($v) . "'";
 						else {
 							$z .= $k . "=now()";
-							// logme('=now()');
 						}
 					}
-
-					//echo $z;
-					$sql = "INSERT INTO $table ($columns) VALUES ($values) ON DUPLICATE KEY UPDATE $z";
-
-
+					$sql = "INSERT INTO $table ($columns) VALUES ($values)";
+                    if (!$noUpdate) {
+                        $sql .= " ON DUPLICATE KEY UPDATE $z";
+                    }
 				} else {
 					$z = "";
 					foreach( $ar as $k => $v ) {
@@ -123,16 +111,15 @@ namespace ottimis\phplibs;
 					$this->logme( "!!! Errore --> " . $db->error(), true );
 					$ret['success'] = 0;
 				} else {
+					$ret['affectedRows'] = $db->affectedRows();
 					$ret['id'] = $db->insert_id();
 					$ret['success'] = 1;
 				}
-				$db->freeresult();
                 $db->close();
 				return $ret;
 			} catch( Exception $e ) {
 				$this->logme("Eccezione db --> " . $e->getMessage(), true);
 				$ret['success'] = 0;
-				$db->freeresult();
                 $db->close();
 				return $ret;
 			}

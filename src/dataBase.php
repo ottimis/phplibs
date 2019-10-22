@@ -29,15 +29,13 @@ namespace ottimis\phplibs;
 
 		// chiusura DB
 		function close() {
-			return (@mysqli_close($this->conn));
+			return (mysqli_close($this->conn));
 		}
 
 		// se error_reporting attivato riporto errore
 		function error() {
-			// if ($this->error_reporting) {
-				return (mysqli_error($this->conn)) ;
-			// }
-		} // chiusura open
+			return (mysqli_error($this->conn)) ;
+		}
 
 		// gruppo funzioni interrogazione
 		function query($sql) {
@@ -46,15 +44,15 @@ namespace ottimis\phplibs;
 		}
 
 		function affectedRows() {
-			return(@mysqli_affected_rows($this->conn));
+			return(mysqli_affected_rows($this->conn));
 		}
 
 		function numrows() {
-			return(@mysqli_num_rows($this->result));
+			return(mysqli_num_rows($this->result));
 		}
 
 		function fetchobject() {
-			return(@mysqli_fetch_object($this->result));
+			return(mysqli_fetch_object($this->result));
 		}
 
 		function fetcharray() {
@@ -66,7 +64,7 @@ namespace ottimis\phplibs;
 		}
 
 		function freeresult() {
-			return(@mysqli_free_result($this->result));
+			return(mysqli_free_result($this->result));
 		}
 
 		function real_escape_string($param)	{
