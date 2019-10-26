@@ -64,7 +64,7 @@ namespace ottimis\phplibs;
 		);
 
 
-		function dbSql( $bInsert, $table, $ar, $idfield, $idvalue, $noUpdate = false ) {
+		function dbSql( $bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false ) {
 
 			$db = new dataBase();
 			$utils = new Utils();

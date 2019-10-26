@@ -24,7 +24,7 @@ namespace ottimis\phplibs;
             $this->database = isset($db) ? getenv('DB_NAME_' . $db) : getenv('DB_NAME');
             $this->port = isset($db) ? getenv('DB_PORT_' . $db) : getenv('DB_PORT');
 
-            $this->conn = new PDO("dblib:host=$this->host:$this->port;dbname=$this->database", "$this->user", "$this->password");
+            $this->conn = new PDO("odbc:host=$this->host:$this->port;dbname=$this->database", "$this->user", "$this->password");
             return $this->conn;
         }
 
