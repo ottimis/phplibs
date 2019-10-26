@@ -2,6 +2,10 @@
 
 namespace ottimis\phplibs;
 
+    use Psr\Http\Message\ResponseInterface as Response;
+    use Psr\Http\Message\ServerRequestInterface as Request;
+    use Slim\Routing\RouteCollectorProxy as RouteCollectorProxy;
+
     /**
      * Create table logs and log_types
         SET NAMES utf8mb4;
@@ -50,13 +54,14 @@ namespace ottimis\phplibs;
         SET FOREIGN_KEY_CHECKS = 1;
      */
 
-    class Logger    {
-
+    class Logger
+    {
         const LOGS = 1;
         const WARNINGS = 2;
         const ERRORS = 3;
 
-        public function log( $note )   {
+        public function log($note)
+        {
             $utils = new Utils();
 
             $ar = array(
@@ -64,38 +69,41 @@ namespace ottimis\phplibs;
                 "note" => $note
             );
             $ret = $utils->dbSql(true, "logs", $ar);
-            if ($ret['success'])    {
+            if ($ret['success']) {
                 return $ret['id'];
             } else {
                 $this->error(json_encode(debug_backtrace()));
             }
         }
 
-        public function warning( $note, $stacktrace )   {
+        public function warning($note)
+        {
             $utils = new Utils();
 
             $ar = array(
                 "type" => 2,
                 "note" => $note,
-                "stacktrace" => $stacktrace
+                "stacktrace" => json_encode(debug_backtrace())
             );
             $ret = $utils->dbSql(true, "logs", $ar);
-            if ($ret['success'])    {
+            if ($ret['success']) {
                 return $ret['id'];
             } else {
-                $this->error(json_encode(debug_backtrace()));
+                $this->error('Fallito warning');
             }
         }
 
-        public function error( $stacktrace )   {
+        public function error($note)
+        {
             $utils = new Utils();
 
             $ar = array(
                 "type" => 3,
-                "stacktrace" => $stacktrace
+                "note" => $note,
+                "stacktrace" => json_encode(debug_backtrace())
             );
             $ret = $utils->dbSql(true, "logs", $ar);
-            if ($ret['success'])    {
+            if ($ret['success']) {
                 return $ret['id'];
             } else {
                 throw new Exception("Errore nella registrazione dell'errore... Brutto!", 1);
@@ -110,22 +118,24 @@ namespace ottimis\phplibs;
          *
          * @return void
          */
-        public function listLogs( $req, $array = false )  {
+        public static function listLogs($req = array(), $array = false)
+        {
             $utils = new Utils();
 
             $arSql = array(
+                "log" => true,
                 "select" => ["l.*", "lt.color", "lt.log_type"],
                 "from" => "logs l",
                 "join" => [
                     [
                         "log_types lt",
-                        "lt.id=logs.type"
+                        "lt.id=l.type"
                     ]
                 ],
                 "order" => "datetime desc"
             );
 
-            if ( isset($req['type']) )  {
+            if (isset($req['type'])) {
                 $arSql['where'] = array(
                     array(
                         "field" => "type",
@@ -134,7 +144,7 @@ namespace ottimis\phplibs;
                 );
             }
 
-            if (isset($req['datetime']) && isset($req['type']))    {
+            if (isset($req['datetime']) && isset($req['type'])) {
                 $arrSql['where'][0]['operatorAfter'] = "AND";
                 $arrSql['where'][] = array(
                     "field" => "datetime",
@@ -143,18 +153,18 @@ namespace ottimis\phplibs;
                 );
             }
 
-            if (isset($req['limit']))   {
+            if (isset($req['limit'])) {
                 $arrSql['limit'] = aray(0, $req['limit']);
             }
             
             $arrSql = $utils->dbSelect($arSql);
 
             if (!$array) {
-                if (sizeof($arrSql) == 1) {
+                if (sizeof($arrSql['data']) == 1) {
                     $arrSql[] = $arrSql;
                 }
-                foreach ($arrSql as $value) {
-                    $ret .= prepareHtml($value);
+                foreach ($arrSql['data'] as $value) {
+                    $ret .= self::prepareHtml($value);
                 }
                 return $ret;
             } else {
@@ -162,27 +172,31 @@ namespace ottimis\phplibs;
             }
         }
 
-        private function prepareHtml($log)  {
+        private static function prepareHtml($log)
+        {
             $text = "Tipo: <b>" . $log['log_type'] . "</b>";
-            $text .= $log['note'] != null ? "Note: " . $log['note'] : "";
-            $text .= $log['stacktrace'] != null? "Stacktrace: " . $log['stacktrace'] : "";
-            return "<span style='color: " . $log['color'] . "'>" . $text . "</span>" . PHP_EOL;
+            if ($log['note'] != "") {
+                $text .= "<br>Note: <b>" . $log['note'] . " </b>";
+            }
+            if ($log['stacktrace']) {
+                $text .= "<br>Stacktrace: " . json_encode(json_decode($log['stacktrace'], true)[1]);
+            }
+            return "<span style='color: " . $log['color'] . "'>" . $text . "</span>" . "<br> <<--->> <br>";
         }
 
 
-        public function api($app)   {
-            $app->group('/logs', function (RouteCollectorProxy $group) {
+        public static function api($app)
+        {
+            $app->group('/pippo', function (RouteCollectorProxy $group) {
                 $group->get('/', function (Request $request, Response $response) {
-
-                    $logs = $this->listLogs();
+                    $logs = self::listLogs();
 
                     $response->getBody()->write($logs);
                     return $response
                             ->withHeader('Content-Type', 'text/html');
                 });
                 $group->get('/today', function (Request $request, Response $response) {
-
-                    $logs = $this->listLogs(array("datetime" => "CURDATE()"));
+                    $logs = self::listLogs(array("datetime" => "CURDATE()"));
 
                     $response->getBody()->write($logs);
                     return $response
@@ -190,14 +204,14 @@ namespace ottimis\phplibs;
                 });
                 $group->group('/log', function (RouteCollectorProxy $groupLog) {
                     $groupLog->get('/', function (Request $request, Response $response) {
-                        $logs = $this->listLogs(array("type" => $this::LOGS));
+                        $logs = self::listLogs(array("type" => self::LOGS));
 
                         $response->getBody()->write($logs);
                         return $response
                                 ->withHeader('Content-Type', 'text/html');
                     });
                     $groupLog->get('/today', function (Request $request, Response $response) {
-                        $logs = $this->listLogs(array("type" => $this::LOGS, "datetime" => "CURDATE()"));
+                        $logs = self::listLogs(array("type" => self::LOGS, "datetime" => "CURDATE()"));
 
                         $response->getBody()->write($logs);
                         return $response
@@ -206,14 +220,14 @@ namespace ottimis\phplibs;
                 });
                 $group->group('/warning', function (RouteCollectorProxy $groupLog) {
                     $groupLog->get('/', function (Request $request, Response $response) {
-                        $logs = $this->listLogs(array("type" => $this::WARNINGS));
+                        $logs = self::listLogs(array("type" => self::WARNINGS));
 
                         $response->getBody()->write($logs);
                         return $response
                                 ->withHeader('Content-Type', 'text/html');
                     });
                     $groupLog->get('/today', function (Request $request, Response $response) {
-                        $logs = $this->listLogs(array("type" => $this::WARNINGS, "datetime" => "CURDATE()"));
+                        $logs = self::listLogs(array("type" => self::WARNINGS, "datetime" => "CURDATE()"));
 
                         $response->getBody()->write($logs);
                         return $response
@@ -222,14 +236,14 @@ namespace ottimis\phplibs;
                 });
                 $group->group('/error', function (RouteCollectorProxy $groupLog) {
                     $groupLog->get('/', function (Request $request, Response $response) {
-                        $logs = $this->listLogs(array("type" => $this::ERRORS));
+                        $logs = self::listLogs(array("type" => self::ERRORS));
 
                         $response->getBody()->write($logs);
                         return $response
                                 ->withHeader('Content-Type', 'text/html');
                     });
                     $groupLog->get('/today', function (Request $request, Response $response) {
-                        $logs = $this->listLogs(array("type" => $this::ERRORS, "datetime" => "CURDATE()"));
+                        $logs = self::listLogs(array("type" => self::ERRORS, "datetime" => "CURDATE()"));
 
                         $response->getBody()->write($logs);
                         return $response
