@@ -67,7 +67,6 @@ namespace ottimis\phplibs;
 		function dbSql( $bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false ) {
 
 			$db = new dataBase();
-			$utils = new Utils();
 
 			try {
 				if( $bInsert ) {
@@ -108,7 +107,8 @@ namespace ottimis\phplibs;
 				$r = $db->query( $sql );
 
 				if( !$r ) {
-					$this->logme( "!!! Errore --> " . $db->error(), true );
+					$log = new Logger();
+			        $log->error('Errore inseriemnto: ' . $db->error() . " Query: " . $sql, "DBSQL");
 					$ret['success'] = 0;
 				} else {
 					$ret['affectedRows'] = $db->affectedRows();
@@ -118,7 +118,8 @@ namespace ottimis\phplibs;
                 $db->close();
 				return $ret;
 			} catch( Exception $e ) {
-				$this->logme("Eccezione db --> " . $e->getMessage(), true);
+				$log = new Logger();
+		        $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
 				$ret['success'] = 0;
                 $db->close();
 				return $ret;
@@ -231,8 +232,10 @@ namespace ottimis\phplibs;
 						$ar['other']);
 			}
 			
-			if (isset($req['log']))
-				$this->logme($sql);
+			if (isset($req['log']))	{
+				$log = new Logger();
+                $log->log("Query: " . $sql, "DBSLC1");
+			}
 
 			$res = $db->query($sql);
 			if ($res)	{
@@ -254,8 +257,8 @@ namespace ottimis\phplibs;
 				else
 					return $ret;
 			} else {
-				$this->logme("SQL --> " . $sql, true);
-				$this->logme($db->error(), true);
+				$log = new Logger();
+                $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
 				$db->freeresult();
                 $db->close();
 				return false;
@@ -316,8 +319,10 @@ namespace ottimis\phplibs;
 					$where,
 					$order );
 			
-			if ($log)	
-				$this->logme( $sql );
+			if ($log)	{
+				$log = new Logger();
+                $log->log('Query: ' . $sql, "CL");
+			}
 
 			$db = new dataBase();
 			$res = $db->query( $sql );

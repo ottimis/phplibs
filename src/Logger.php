@@ -20,6 +20,7 @@ namespace ottimis\phplibs;
         `type` int(11) DEFAULT NULL,
         `stacktrace` text,
         `note` varchar(255) DEFAULT NULL,
+        `cod` varchar(10) DEFAULT NULL,
         `datetime` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`)
         ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
@@ -60,50 +61,53 @@ namespace ottimis\phplibs;
         const WARNINGS = 2;
         const ERRORS = 3;
 
-        public function log($note)
-        {
+        public function log( $note, $code = NULL )   {
             $utils = new Utils();
 
-            $ar = array(
-                "type" => 1,
-                "note" => $note
+            $db = new dataBase();
+            $sql = sprintf(
+                "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', '%s')",
+                $db->real_escape_string($note),
+                $db->real_escape_string($code)
             );
-            $ret = $utils->dbSql(true, "logs", $ar);
-            if ($ret['success']) {
+            $ret = $db->query($sql);
+            if ($ret != false)    {
                 return $ret['id'];
             } else {
-                $this->error(json_encode(debug_backtrace()));
+                $this->error('Fallito log', 'LOG1');
             }
         }
 
-        public function warning($note)
-        {
+        public function warning( $note, $code = NULL )   {
             $utils = new Utils();
-
-            $ar = array(
-                "type" => 2,
-                "note" => $note,
-                "stacktrace" => json_encode(debug_backtrace())
+            
+            $db = new dataBase();
+            $sql = sprintf(
+                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
+                $db->real_escape_string(json_encode(debug_backtrace())),
+                $db->real_escape_string($note),
+                $db->real_escape_string($code)
             );
-            $ret = $utils->dbSql(true, "logs", $ar);
-            if ($ret['success']) {
+            $ret = $db->query($sql);
+            if ($ret != false)    {
                 return $ret['id'];
             } else {
-                $this->error('Fallito warning');
+                $this->error('Fallito warning', 'LOG2');
             }
         }
 
-        public function error($note)
-        {
+        public function error( $note, $code = NULL )   {
             $utils = new Utils();
 
-            $ar = array(
-                "type" => 3,
-                "note" => $note,
-                "stacktrace" => json_encode(debug_backtrace())
+            $db = new dataBase();
+            $sql = sprintf(
+                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', '%s')",
+                $db->real_escape_string(json_encode(debug_backtrace())),
+                $db->real_escape_string($note),
+                $db->real_escape_string($code)
             );
-            $ret = $utils->dbSql(true, "logs", $ar);
-            if ($ret['success']) {
+            $ret = $db->query($sql);
+            if ($ret != false)    {
                 return $ret['id'];
             } else {
                 throw new Exception("Errore nella registrazione dell'errore... Brutto!", 1);
@@ -123,7 +127,6 @@ namespace ottimis\phplibs;
             $utils = new Utils();
 
             $arSql = array(
-                "log" => true,
                 "select" => ["l.*", "lt.color", "lt.log_type"],
                 "from" => "logs l",
                 "join" => [
@@ -175,6 +178,9 @@ namespace ottimis\phplibs;
         private static function prepareHtml($log)
         {
             $text = "Tipo: <b>" . $log['log_type'] . "</b>";
+            $text .= "<br>Data: <b>" . $log['datetime'] . "</b>";
+            if ($log['code'] != "")
+                $text .= "<br>Code: <b>" . $log['code'] . " </b>";
             if ($log['note'] != "") {
                 $text .= "<br>Note: <b>" . $log['note'] . " </b>";
             }
@@ -187,8 +193,8 @@ namespace ottimis\phplibs;
 
         public static function api($app)
         {
-            $app->group('/pippo', function (RouteCollectorProxy $group) {
-                $group->get('/', function (Request $request, Response $response) {
+            $app->group('/logs', function (RouteCollectorProxy $group) {
+                $group->get('', function (Request $request, Response $response) {
                     $logs = self::listLogs();
 
                     $response->getBody()->write($logs);
@@ -203,7 +209,7 @@ namespace ottimis\phplibs;
                             ->withHeader('Content-Type', 'text/html');
                 });
                 $group->group('/log', function (RouteCollectorProxy $groupLog) {
-                    $groupLog->get('/', function (Request $request, Response $response) {
+                    $groupLog->get('', function (Request $request, Response $response) {
                         $logs = self::listLogs(array("type" => self::LOGS));
 
                         $response->getBody()->write($logs);
@@ -219,7 +225,7 @@ namespace ottimis\phplibs;
                     });
                 });
                 $group->group('/warning', function (RouteCollectorProxy $groupLog) {
-                    $groupLog->get('/', function (Request $request, Response $response) {
+                    $groupLog->get('', function (Request $request, Response $response) {
                         $logs = self::listLogs(array("type" => self::WARNINGS));
 
                         $response->getBody()->write($logs);
@@ -235,7 +241,7 @@ namespace ottimis\phplibs;
                     });
                 });
                 $group->group('/error', function (RouteCollectorProxy $groupLog) {
-                    $groupLog->get('/', function (Request $request, Response $response) {
+                    $groupLog->get('', function (Request $request, Response $response) {
                         $logs = self::listLogs(array("type" => self::ERRORS));
 
                         $response->getBody()->write($logs);
