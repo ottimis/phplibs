@@ -252,10 +252,10 @@ namespace ottimis\phplibs;
 				}
 				$db->freeresult();
                 $db->close();
-				if (sizeof($ret['data']) == 1)
-					return $ret['data'][0];
-				else
-					return $ret;
+				// if (sizeof($ret['data']) == 1)
+				// 	return $ret['data'][0];
+				// else
+				return $ret;
 			} else {
 				$log = new Logger();
                 $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
