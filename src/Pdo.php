@@ -2,7 +2,7 @@
 
 namespace ottimis\phplibs;
 
-	class pdo	{
+	class Pdo	{
 
 		protected $host = '';
 		protected $user = '';

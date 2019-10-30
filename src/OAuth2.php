@@ -35,7 +35,7 @@ namespace ottimis\phplibs;
             $this->username = getenv('DB_USER');
             $this->password = getenv('DB_PASSWORD');
             $this->dsn = $driver . ':' . $this->dbname . $this->host;
-            $this->storage = new PdoOAuth(array('dsn' => $this->dsn, 'username' => $this->username, 'password' => $this->password));
+            $this->storage = new PdoOA(array('dsn' => $this->dsn, 'username' => $this->username, 'password' => $this->password));
             $this->server = new OAServer($this->storage, $serverConfig);
         }
 
