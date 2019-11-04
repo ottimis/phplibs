@@ -97,7 +97,7 @@ namespace ottimis\phplibs;
                     $this->server->handleAuthorizeRequest($request, $responseOAuth, $ret['success']);
                     return $this->response($response, $responseOAuth);
                 });
-                $group->get('/verify', function (Request $request, Response $response) {
+                $group->post('/verify', function (Request $request, Response $response) {
                     $request = OAuthRequest::createFromGlobals();
                     $responseOAuth = new OAuthResponse();
 
@@ -110,7 +110,7 @@ namespace ottimis\phplibs;
                     $responseOAuth->setParameters($data);
                     return $this->response($response, $responseOAuth);
                 });
-                $group->get('/token', function (Request $request, Response $response) {
+                $group->post('/token', function (Request $request, Response $response) {
                     $request = OAuthRequest::createFromGlobals();
                     $responseOAuth = new OAuthResponse();
 
