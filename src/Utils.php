@@ -170,9 +170,19 @@ namespace ottimis\phplibs;
 						case 'where':
 							foreach ($value as $v) {
 								if (!isset($v['operator'])) {
-									$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+									if (isset($ar[$key]))
+										$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+									else {
+										$ar[$key] = '';
+										$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+									}
 								} else {
-									$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
+									if (isset($ar[$key]))
+										$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
+									else {
+										$ar[$key] = '';
+										$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
+									}
 								}
 								if (isset($v['operatorAfter']))	{
 									if (isset($value[$key + 1]))
@@ -182,11 +192,21 @@ namespace ottimis\phplibs;
 							break;
                         case 'join':
                             foreach ($value as $v) {
-                                $ar[$key] .= sprintf("LEFT JOIN %s ON %s \r", $v[0], $v[1]);
+								if (isset($ar[$key]))
+									$ar[$key] .= sprintf("LEFT JOIN %s ON %s \r", $v[0], $v[1]);
+								else {
+									$ar[$key] = '';
+									$ar[$key] .= sprintf("LEFT JOIN %s ON %s \r", $v[0], $v[1]);
+								}
                             }
                             break;
                         case 'limit':
-                            $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+                            if (isset($ar[$key]))
+								$ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+							else {
+								$ar[$key] = '';
+								$ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+							}
                             break;
 
                         default:
@@ -216,11 +236,11 @@ namespace ottimis\phplibs;
 					isset($req['count']) ? "SQL_CALC_FOUND_ROWS " : '',
                     $ar['select'],
                     $ar['from'],
-                    $ar['join'],
+                    isset($ar['join']) ? $ar['join'] : '',
                     isset($ar['where']) ? "WHERE " . $ar['where'] : '',
                     isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
                     isset($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
-                    $ar['other']
+                    isset($ar['other']) ? $ar['other'] : ''
                 );
             }	else if(isset($req['delete']))	{
 				$sql = sprintf("DELETE
@@ -243,7 +263,7 @@ namespace ottimis\phplibs;
 				while ($rec = $db->fetchassoc()) {
 					$ret['data'][] = $rec;
 				}
-				if ($req['count'])	{
+				if (isset($req['count']))	{
 					$db->query("SELECT FOUND_ROWS()");
                     $ret['total'] = intval($db->fetcharray()[0]);
                     $ret['count'] = sizeof($ret['data']);
