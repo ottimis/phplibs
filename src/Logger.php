@@ -135,7 +135,7 @@ namespace ottimis\phplibs;
                         "lt.id=l.type"
                     ]
                 ],
-                "order" => "datetime desc"
+                "order" => "id asc"
             );
 
             if (isset($req['type'])) {
