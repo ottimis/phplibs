@@ -135,7 +135,7 @@ namespace ottimis\phplibs;
                         "lt.id=l.type"
                     ]
                 ],
-                "order" => "id asc"
+                "order" => "id desc"
             );
 
             if (isset($req['type'])) {
