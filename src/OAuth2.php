@@ -26,7 +26,7 @@ namespace ottimis\phplibs;
         protected $password = '';
         protected $storage;
         protected $server;
-        
+        protected $authenticationUrl = '';
 
         public function __construct($driver = 'mysql', $serverConfig = array())
         {
@@ -38,6 +38,31 @@ namespace ottimis\phplibs;
             $this->storage = new PdoOA(array('dsn' => $this->dsn, 'username' => $this->username, 'password' => $this->password));
             $this->server = new OAServer($this->storage, $serverConfig);
         }
+
+        // START: Private functions
+
+        private function response($response, $responseOAuth)
+        {
+            $response->getBody()->write($responseOAuth->getResponseBody('json'));
+            $response = $response->withHeader('Content-Type', 'application/json');
+            foreach ($responseOAuth->getHttpHeaders() as $name => $header) {
+                $response = $response->withHeader($name, $header);
+            }
+            return $response
+                    ->withStatus($responseOAuth->getStatusCode());
+        }
+
+        private function defaultAuthPage()
+        {
+            echo '<form action="" method="post">
+                    <input type="text" name="username">
+                    <input type="text" name="password">
+                    <button type="submit">Invia</button>
+                </form>';
+            exit;
+        }
+
+        // START: Public functions
 
         public function addGrantType($type, $arConfig = array())
         {
@@ -56,17 +81,11 @@ namespace ottimis\phplibs;
             }
         }
 
-        private function response($response, $responseOAuth)
+        public function setAuthenticationUrl($url)
         {
-            $response->getBody()->write($responseOAuth->getResponseBody('json'));
-            $response = $response->withHeader('Content-Type', 'application/json');
-            foreach ($responseOAuth->getHttpHeaders() as $name => $header) {
-                $response = $response->withHeader($name, $header);
-            }
-            return $response
-                    ->withStatus($responseOAuth->getStatusCode());
+            $this->authenticationUrl = $url;
+            return true;
         }
-
 
         public function api($app)
         {
@@ -79,25 +98,57 @@ namespace ottimis\phplibs;
                     if (!$this->server->validateAuthorizeRequest($request, $responseOAuth)) {
                         return $this->response($response, $responseOAuth);
                     }
+                    $params = $request->getAllQueryParameters();
                     // display an authorization form
-                    if (empty($_POST)) {
-                        echo '<form action="" method="post">
-                                <input type="text" name="username">
-                                <input type="text" name="password">
-                                <button type="submit">Invia</button>
-                            </form>';
-                        exit;
+                    if (!isset($params['id'])) {
+                        if ($this->authenticationUrl != '') {
+                            // Save incoming request to verifiy on authentication client
+                            if (!$this->storage->setRequest($params['client_id'], $params['state'])) {
+                                $response->getBody()->write('Errore 33 - Contatta l\'amministratore del sistema.');
+                                return $response
+                                        ->withStatus(400)
+                                        ->withHeader('Content-Type', 'text/plain');
+                            }
+                            // Set redirect to authentication client
+                            $responseOAuth->setParameters($params);
+                            $responseOAuth->setRedirect(302, $this->authenticationUrl, $params['state']);
+                            return $this->response($response, $responseOAuth);
+                        } else {
+                            defaultAuthPage();
+                        }
                     }
-                    $ret['success'] = false;
-                    // print the authorization code if the user has authorized your client
-                    if ($_POST['username'] == 'admin' && $_POST['password'] == 'admin') {
-                        $ret['success'] = true;
+                    // Se l'id è zero vuol dire che il sistema di autenticazione non ha validato con successo la richiesta.
+                    if ($params['id'] == 0) {
+                        $response->getBody()->write('Errore 10 - Contatta l\'amministratore del sistema.');
+                        return $response
+                                ->withStatus(500)
+                                ->withHeader('Content-Type', 'text/plain');
+                    } else {
+                        $success = $this->storage->verifyRequest($params['client_id'], $params['state'], true);
                     }
-                    
-                    $this->server->handleAuthorizeRequest($request, $responseOAuth, $ret['success']);
+                    $this->server->handleAuthorizeRequest($request, $responseOAuth, $success, $params['id']);
                     return $this->response($response, $responseOAuth);
                 });
+
+                // Funzione di verifica temporanea della richiesta ricevuta sul client
                 $group->post('/verify', function (Request $request, Response $response) {
+                    $request = OAuthRequest::createFromGlobals();
+                    $responseOAuth = new OAuthResponse();
+                    $logger = new Logger();
+
+                    $body = json_decode($request->getContent(), true);
+
+                    $logger->log(json_encode($body));
+
+                    if ($this->storage->verifyRequest($body['client_id'], $body['state'])) {
+                        $responseOAuth->setStatusCode(200);
+                    } else {
+                        $responseOAuth->setStatusCode(400);
+                    }
+
+                    return $this->response($response, $responseOAuth);
+                });
+                $group->post('/userinfo', function (Request $request, Response $response) {
                     $request = OAuthRequest::createFromGlobals();
                     $responseOAuth = new OAuthResponse();
 
@@ -106,7 +157,9 @@ namespace ottimis\phplibs;
                         die;
                     }
 
-                    $data = $server->getAccessTokenData($request);
+                    $userId = $this->server->getAccessTokenData($request)['user_id'];
+                    
+                    $data = $this->storage->getUserData($userId);
                     $responseOAuth->setParameters($data);
                     return $this->response($response, $responseOAuth);
                 });
@@ -117,6 +170,41 @@ namespace ottimis\phplibs;
                     $this->server->handleTokenRequest($request, $responseOAuth);
 
                     return $this->response($response, $responseOAuth);
+                });
+
+                $group->group('/verify', function (RouteCollectorProxy $groupVerify) {
+                    $groupVerify->post('/token', function (Request $request, Response $response) {
+                        $request = OAuthRequest::createFromGlobals();
+                        $responseOAuth = new OAuthResponse();
+
+                        if (!$this->server->verifyResourceRequest($request, $responseOAuth)) {
+                            return $this->response($response, $responseOAuth);
+                            die;
+                        }
+                        
+                        return $this->response($response, $responseOAuth);
+                    });
+                    $groupVerify->post('/authorizations', function (Request $request, Response $response) {
+                        $request = OAuthRequest::createFromGlobals();
+                        $responseOAuth = new OAuthResponse();
+
+                        if (!$this->server->verifyResourceRequest($request, $responseOAuth)) {
+                            return $this->response($response, $responseOAuth);
+                            die;
+                        }
+
+                        $params = $request->request;
+
+                        $userId = $this->server->getAccessTokenData($request)['user_id'];
+                        $data = $this->storage->getUserData($userId);
+
+                        if (array_search($params['auth'], json_decode($data['authorizations'], true)) !== false) {
+                            return $this->response($response, $responseOAuth);
+                        } else {
+                            $responseOAuth->setStatusCode(400);
+                            return $this->response($response, $responseOAuth);
+                        }
+                    });
                 });
             });
         }

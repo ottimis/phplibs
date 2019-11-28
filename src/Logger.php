@@ -20,7 +20,7 @@ namespace ottimis\phplibs;
         `type` int(11) DEFAULT NULL,
         `stacktrace` text,
         `note` varchar(255) DEFAULT NULL,
-        `cod` varchar(10) DEFAULT NULL,
+        `code` varchar(10) DEFAULT NULL,
         `datetime` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`)
         ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
@@ -166,6 +166,7 @@ namespace ottimis\phplibs;
                 if (sizeof($arrSql['data']) == 1) {
                     $arrSql[] = $arrSql;
                 }
+                $ret = '';
                 foreach ($arrSql['data'] as $value) {
                     $ret .= self::prepareHtml($value);
                 }

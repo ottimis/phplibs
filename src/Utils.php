@@ -67,40 +67,43 @@ namespace ottimis\phplibs;
 		function dbSql( $bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false ) {
 
 			$db = new dataBase();
+			$values = '';
+            $z = '';
 
 			try {
-				if( $bInsert ) {
-					$columns = implode( ", ",array_keys($ar) );
-					foreach( $ar as $k ) {						
+				if ($bInsert) {
+					$columns = implode(", ", array_keys($ar));
+					foreach ($ar as $k) {
 						$values .= $values != '' ? "," : "";
-						if( $k != 'now()' )
-							$values .= "'" . $db->real_escape_string( $k ) . "'";
-						else
-							$values .= $db->real_escape_string( $k );
+						if (strtolower(substr($k, 0, 5)) !== "now()") {
+							$values .= "'" . $db->real_escape_string($k) . "'";
+						} else {
+							$values .= $db->real_escape_string($k);
+						}
 					}
-					foreach( $ar as $k => $v ) {
+					foreach ($ar as $k => $v) {
 						$z .= $z != '' ? "," : "";
-						if( $v !== "now()" )
+						if (strtolower(substr($v, 0, 5)) !== "now()") {
 							$z .= $k . "='" . $db->real_escape_string($v) . "'";
-						else {
-							$z .= $k . "=now()";
+						} else {
+							$z .= $k . "=" . $v;
 						}
 					}
 					$sql = "INSERT INTO $table ($columns) VALUES ($values)";
-                    if (!$noUpdate) {
-                        $sql .= " ON DUPLICATE KEY UPDATE $z";
-                    }
+					if (!$noUpdate) {
+						$sql .= " ON DUPLICATE KEY UPDATE $z";
+					}
 				} else {
 					$z = "";
-					foreach( $ar as $k => $v ) {
-						$z .= ($z != "" ) ? ",":"";
-						if( $v != 'now()' )
+					foreach ($ar as $k => $v) {
+						$z .= ($z != "") ? ",":"";
+						if (strtolower(substr($v, 0, 5)) !== "now()") {
 							$z .= $k . "='" . $db->real_escape_string($v) . "'";
-						else
-							$z .= $k . "=" . $db->real_escape_string($v) . "";
-
+						} else {
+							$z .= $k . "=" . $v . "";
+						}
 					}
-					$sql = sprintf( "UPDATE %s SET %s WHERE %s='%s'", $table, $z, $idfield, $idvalue );
+					$sql = sprintf("UPDATE %s SET %s WHERE %s='%s'", $table, $z, $idfield, $idvalue);
 				}
 
 				$ret['sql'] = $sql;
@@ -162,13 +165,14 @@ namespace ottimis\phplibs;
 
         function dbSelect($req)
         {
-            $db = new dataBase();
+			$db = new dataBase();
+			$ar = array();
 
             foreach ($req as $key => $value) {
                 if (isset($req[$key])) {
                     switch ($key) {
 						case 'where':
-							foreach ($value as $v) {
+							foreach ($value as $k => $v) {
 								if (!isset($v['operator'])) {
 									if (isset($ar[$key]))
 										$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
@@ -185,7 +189,7 @@ namespace ottimis\phplibs;
 									}
 								}
 								if (isset($v['operatorAfter']))	{
-									if (isset($value[$key + 1]))
+									if (isset($value[$k + 1]))
 										$ar[$key] .= sprintf(" %s ",$v['operatorAfter']);
 								}
 							}
@@ -212,7 +216,12 @@ namespace ottimis\phplibs;
                         default:
                             if (gettype($value) == 'array') {
                                 foreach ($value as $v) {
-                                    $ar[$key] .= $v .= ', ';
+                                    if (isset($ar[$key]))
+										$ar[$key] .= $v .= ', ';
+									else	{
+										$ar[$key] = '';
+										$ar[$key] .= $v .= ', ';
+									}
                                 }
                                 $ar[$key] = substr($ar[$key], 0, -2);
                             } else {

@@ -1,6 +1,6 @@
 {
     "name": "ottimis/phplibs",
-    "version": "1.5.9",
+    "version": "1.6.0",
     "keywords": ["release", "official"],
     "description": "Php Library",
     "autoload": {
@@ -10,7 +10,7 @@
     },
     "require": {
         "firebase/php-jwt": "^5.0",
-        "slim/slim": "4.0.0",
+        "slim/slim": "4.2.0",
         "slim/psr7": "^0.6.0"
     }
 }
