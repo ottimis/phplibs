@@ -207,5 +207,138 @@ namespace ottimis\phplibs;
                     });
                 });
             });
+            // Admin users endpoints
+            $app->group('/admin', function (RouteCollectorProxy $group) {
+                $group->get('/users', function (Request $request, Response $response) {
+                    $queryParams = $request->getQueryParams();
+                    $search = isset($queryParams['s']) ? $queryParams['s'] : '';
+                    unset($queryParams['s']);
+                    $pagination = $queryParams;
+
+                    $params = json_decode($request->getBody(), true);
+                    if (isset($params['id'])) {
+                        $users = $this->storage->getUser($params['id']);
+                    } else {
+                        $users = $this->storage->listUsers($search, $pagination);
+                    }
+                    if ($users === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    $response->getBody()->write(json_encode($users, JSON_NUMERIC_CHECK));
+                    return $response
+                                ->withStatus(200)
+                                ->withHeader('Content-Type', 'application/json');
+                });
+                $group->post('/user', function (Request $request, Response $response) {
+                    $params = json_decode($request->getBody(), true);
+                    $user = $this->storage->saveUser($params);
+                    if ($user === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    return $response
+                                ->withStatus(200);
+                });
+                $group->delete('/user/{id}', function (Request $request, Response $response, $args) {
+                    $user = $this->storage->deleteUser($args['id']);
+                    if ($user === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    return $response
+                                ->withStatus(200);
+                });
+                $group->get('/clients', function (Request $request, Response $response) {
+                    $queryParams = $request->getQueryParams();
+                    $search = isset($queryParams['s']) ? $queryParams['s'] : '';
+                    unset($queryParams['s']);
+                    $pagination = $queryParams;
+
+                    $params = json_decode($request->getBody(), true);
+                    if (isset($params['id'])) {
+                        $clients = $this->storage->getClient($params['id']);
+                    } else {
+                        $clients = $this->storage->listClients($search, $pagination);
+                    }
+                    if ($clients === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    $response->getBody()->write(json_encode($clients, JSON_NUMERIC_CHECK));
+                    return $response
+                                ->withStatus(200)
+                                ->withHeader('Content-Type', 'application/json');
+                });
+                $group->post('/client', function (Request $request, Response $response) {
+                    $params = json_decode($request->getBody(), true);
+                    $cient = $this->storage->saveClient($params);
+                    if ($cient === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    return $response
+                                ->withStatus(200);
+                });
+                $group->delete('/client/{id}', function (Request $request, Response $response, $args) {
+                    $client = $this->storage->deleteClient($args['id']);
+                    if ($client === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    return $response
+                                ->withStatus(200);
+                });
+                $group->get('/roles', function (Request $request, Response $response) {
+                    $queryParams = $request->getQueryParams();
+                    $search = isset($queryParams['s']) ? $queryParams['s'] : '';
+                    unset($queryParams['s']);
+                    $pagination = $queryParams;
+
+                    $params = json_decode($request->getBody(), true);
+                    if (isset($params['id'])) {
+                        $roles = $this->storage->getRole($params['id']);
+                    } else {
+                        $roles = $this->storage->listRoles($search, $pagination);
+                    }
+                    if ($roles === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    $response->getBody()->write(json_encode($roles, JSON_NUMERIC_CHECK));
+                    return $response
+                                ->withStatus(200)
+                                ->withHeader('Content-Type', 'application/json');
+                });
+                $group->post('/role', function (Request $request, Response $response) {
+                    $params = json_decode($request->getBody(), true);
+                    $role = $this->storage->saveRole($params);
+                    if ($role === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    return $response
+                                ->withStatus(200);
+                });
+                $group->delete('/role', function (Request $request, Response $response) {
+                    $params = json_decode($request->getBody(), true);
+                    $role = $this->storage->deleteRole($params['id']);
+                    if ($role === false) {
+                        return $response
+                                    ->withStatus(400)
+                                    ->withHeader('Content-Type', 'text/plain');
+                    }
+                    return $response
+                                ->withStatus(200);
+                });
+            });
         }
     }
