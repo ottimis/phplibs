@@ -87,6 +87,16 @@ namespace ottimis\phplibs;
             return true;
         }
 
+        public function successLogin($id, $state)
+        {
+            return $this->storage->successRequest($id, $state);
+        }
+
+        public function getClient($client_id)
+        {
+            return $this->storage->getClient($client_id);
+        }
+
         public function api($app)
         {
             $app->group('/oauth2', function (RouteCollectorProxy $group) {
@@ -124,7 +134,7 @@ namespace ottimis\phplibs;
                                 ->withStatus(500)
                                 ->withHeader('Content-Type', 'text/plain');
                     } else {
-                        $success = $this->storage->verifyRequest($params['client_id'], $params['state'], true);
+                        $success = $this->storage->verifyRequest($params['client_id'], $params['state'], true, $params['id']);
                     }
                     $this->server->handleAuthorizeRequest($request, $responseOAuth, $success, $params['id']);
                     return $this->response($response, $responseOAuth);

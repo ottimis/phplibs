@@ -96,6 +96,64 @@ Add additional notes about how to deploy this on a live system -->
 * [OAuth 2.0 Server PHP by bshaffer](https://bshaffer.github.io/oauth2-server-php-docs) - OAuth 2 library
 * [Slim Framework 4](https://www.slimframework.com/) - Api libs
 
+
+## Logger
+
+### Getting Started
+
+Creare le tabelle necessarie alla libreria con la seguente query SQL ed importare la libreria con composer
+
+```
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for logs
+-- ----------------------------
+DROP TABLE IF EXISTS `logs`;
+CREATE TABLE `logs` (
+`id` int(11) NOT NULL AUTO_INCREMENT,
+`type` int(11) DEFAULT NULL,
+`stacktrace` text,
+`note` text,
+`code` varchar(10) DEFAULT NULL,
+`datetime` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=5397 DEFAULT CHARSET=latin1;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+<--------------------log_types------------------------------>
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for log_types
+-- ----------------------------
+DROP TABLE IF EXISTS `log_types`;
+CREATE TABLE `log_types` (
+`id` int(11) NOT NULL AUTO_INCREMENT,
+`log_type` varchar(15) DEFAULT NULL,
+`color` varchar(7) DEFAULT NULL,
+PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
+
+-- ----------------------------
+-- Records of log_types
+-- ----------------------------
+BEGIN;
+INSERT INTO `log_types` VALUES (1, 'Log', '#259d00');
+INSERT INTO `log_types` VALUES (2, 'Warning', '#d8a00d');
+INSERT INTO `log_types` VALUES (3, 'Error', '#d81304');
+COMMIT;
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+```
+use \ottimis\phplibs\OAuth2;
+```
+
 <!-- ## Contributing
 
 Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us. -->

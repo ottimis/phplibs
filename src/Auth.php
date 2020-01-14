@@ -148,7 +148,7 @@ use Firebase\JWT\JWT;
          *
          * @return void
          */
-        public function tokenRefresh($idRole, $data)
+        public function tokenRefresh($idRole, $data = array())
         {
             $utils = new Utils();
             $time = $this->tokenExpiration != '' ? $this->tokenExpiration : time() + (60 * 60 * 24 * 10); 
@@ -160,6 +160,23 @@ use Firebase\JWT\JWT;
             $ar['token_date'] = 'now()';
             $ret = $utils->dbSql(true, $this->tokenTable, $ar, "", "");
             return $jwt;
+        }
+
+        /**
+         * tokenDecode
+         *
+         * @param  String $token
+         *
+         * @return void
+         */
+        public function tokenDecode($token)
+        {
+            try {
+                $decoded = (array) JWT::decode($token, $this->tokenKey, array('HS256'));
+            } catch (Exception $e) {
+                return false;
+            }
+            return $decoded;
         }
 
         public function addToWhiteList($ar) {

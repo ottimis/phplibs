@@ -19,11 +19,11 @@ namespace ottimis\phplibs;
         `id` int(11) NOT NULL AUTO_INCREMENT,
         `type` int(11) DEFAULT NULL,
         `stacktrace` text,
-        `note` varchar(255) DEFAULT NULL,
+        `note` text,
         `code` varchar(10) DEFAULT NULL,
         `datetime` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1;
+        ) ENGINE=MyISAM AUTO_INCREMENT=5397 DEFAULT CHARSET=latin1;
 
         SET FOREIGN_KEY_CHECKS = 1;
 
@@ -41,15 +41,15 @@ namespace ottimis\phplibs;
         `log_type` varchar(15) DEFAULT NULL,
         `color` varchar(7) DEFAULT NULL,
         PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
+        ) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=latin1;
 
         -- ----------------------------
         -- Records of log_types
         -- ----------------------------
         BEGIN;
-        INSERT INTO `log_types` VALUES (1, 'log', '#259d00');
-        INSERT INTO `log_types` VALUES (2, 'warning', '#d8a00d');
-        INSERT INTO `log_types` VALUES (3, 'error', '#d81304');
+        INSERT INTO `log_types` VALUES (1, 'Log', '#259d00');
+        INSERT INTO `log_types` VALUES (2, 'Warning', '#d8a00d');
+        INSERT INTO `log_types` VALUES (3, 'Error', '#d81304');
         COMMIT;
 
         SET FOREIGN_KEY_CHECKS = 1;
@@ -178,17 +178,32 @@ namespace ottimis\phplibs;
 
         private static function prepareHtml($log)
         {
-            $text = "Tipo: <b>" . $log['log_type'] . "</b>";
-            $text .= "<br>Data: <b>" . $log['datetime'] . "</b>";
+            $text .= "<b>" . date( "d-m-Y - H:i:s", strtotime( $log['datetime'] ) ) . "</b>";
             if ($log['code'] != "")
-                $text .= "<br>Code: <b>" . $log['code'] . " </b>";
+                $text .= " - Code: <b>" . $log['code'] . "</b>";
             if ($log['note'] != "") {
-                $text .= "<br>Note: <b>" . $log['note'] . " </b>";
+                $text .= "<br><code>" . $log['note'] . "</code> ";
             }
             if ($log['stacktrace']) {
                 $text .= "<br>Stacktrace: " . json_encode(json_decode($log['stacktrace'], true)[1]);
             }
-            return "<span style='color: " . $log['color'] . "'>" . $text . "</span>" . "<br> <<--->> <br>";
+            return "<p class=\"c-" . $log['type'] . "\">" . $text . "</p><hr>";
+        }
+
+        private static function prepareHeader()
+        {
+            $text = "<!doctype html>
+              <html>
+              <head>
+              <style>
+                body {padding:5px; font-family:arial;}
+                .c-1 {color:#259d00;}
+                .c-2 {color:#d8a00d;}
+                .c-3 {color:#d81304;}
+              </style>
+              </head>
+              <body>";
+            return $text;
         }
 
 
