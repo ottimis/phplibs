@@ -166,10 +166,10 @@ namespace ottimis\phplibs;
                 if (sizeof($arrSql['data']) == 1) {
                     $arrSql[] = $arrSql;
                 }
-                $ret = '';
                 foreach ($arrSql['data'] as $value) {
                     $ret .= self::prepareHtml($value);
                 }
+                $ret = self::prepareHeader() . $ret;
                 return $ret;
             } else {
                 return $arrSql;
