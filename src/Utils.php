@@ -4,6 +4,7 @@ namespace ottimis\phplibs;
 
 	class Utils	{
 
+		public $dataBase;
 		protected $httpCodes = array(
 			100 => 'Continue',
 			101 => 'Switching Protocols',
@@ -63,10 +64,14 @@ namespace ottimis\phplibs;
 			510 => 'Not Extended'
 		);
 
+		function __construct()	{
+			$this->dataBase = new database();
+		}
+
 
 		function dbSql( $bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false ) {
 
-			$db = new dataBase();
+			$db = $this->dataBase;
 			$values = '';
             $z = '';
 
@@ -165,7 +170,7 @@ namespace ottimis\phplibs;
 
         function dbSelect($req)
         {
-			$db = new dataBase();
+			$db = $this->dataBase;
 			$ar = array();
 
             foreach ($req as $key => $value) {
@@ -353,7 +358,7 @@ namespace ottimis\phplibs;
                 $log->log('Query: ' . $sql, "CL");
 			}
 
-			$db = new dataBase();
+			$db = $this->dataBase;
 			$res = $db->query( $sql );
 			$ar = array();
 			while( $rec = $db->fetchassoc() ) {

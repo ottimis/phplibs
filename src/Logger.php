@@ -60,11 +60,16 @@ namespace ottimis\phplibs;
         const LOGS = 1;
         const WARNINGS = 2;
         const ERRORS = 3;
+        public $dataBase;
+
+        function __contruct() {
+            $this->dataBase = new dataBase();
+        }
 
         public function log( $note, $code = NULL )   {
             $utils = new Utils();
 
-            $db = new dataBase();
+            $db = $this->dataBase;
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', '%s')",
                 $db->real_escape_string($note),
@@ -81,7 +86,7 @@ namespace ottimis\phplibs;
         public function warning( $note, $code = NULL )   {
             $utils = new Utils();
             
-            $db = new dataBase();
+            $db = $this->dataBase;
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
                 $db->real_escape_string(json_encode(debug_backtrace())),
@@ -99,7 +104,7 @@ namespace ottimis\phplibs;
         public function error( $note, $code = NULL )   {
             $utils = new Utils();
 
-            $db = new dataBase();
+            $db = $this->dataBase;
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', '%s')",
                 $db->real_escape_string(json_encode(debug_backtrace())),
