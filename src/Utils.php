@@ -65,7 +65,7 @@ namespace ottimis\phplibs;
 		);
 
 		function __construct()	{
-			$this->dataBase = new database();
+			$this->dataBase = new dataBase();
 		}
 
 

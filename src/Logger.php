@@ -62,7 +62,7 @@ namespace ottimis\phplibs;
         const ERRORS = 3;
         public $dataBase;
 
-        function __contruct() {
+        function __construct() {
             $this->dataBase = new dataBase();
         }
 
@@ -115,7 +115,7 @@ namespace ottimis\phplibs;
             if ($ret != false)    {
                 return $ret['id'];
             } else {
-                throw new Exception("Errore nella registrazione dell'errore... Brutto!", 1);
+                throw new \Exception("Errore nella registrazione dell'errore... Brutto!", 1);
             }
         }
 
