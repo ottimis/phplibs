@@ -186,7 +186,7 @@ namespace ottimis\phplibs;
 									foreach ($v['value'] as $kIN => $vIN) {
 										$inValues[] = "'" . $db->real_escape_string($vIN) . "'";
 									}
-									$ar[$key] .= sprintf("IN(%s)", implode(',', $inValues));
+									$ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
 								} else {
 									$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
 								}
