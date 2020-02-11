@@ -80,18 +80,18 @@ namespace ottimis\phplibs;
 					$columns = implode(", ", array_keys($ar));
 					foreach ($ar as $k) {
 						$values .= $values != '' ? "," : "";
-						if (strtolower(substr($k, 0, 5)) !== "now()") {
+						if ($k !== "now()") {
 							$values .= "'" . $db->real_escape_string($k) . "'";
 						} else {
-							$values .= $db->real_escape_string($k);
+							$values .= "now()";
 						}
 					}
 					foreach ($ar as $k => $v) {
 						$z .= $z != '' ? "," : "";
-						if (strtolower(substr($v, 0, 5)) !== "now()") {
+						if ($v !== "now()") {
 							$z .= $k . "='" . $db->real_escape_string($v) . "'";
 						} else {
-							$z .= $k . "=" . $v;
+							$z .= $k . "=now()";
 						}
 					}
 					$sql = "INSERT INTO $table ($columns) VALUES ($values)";
@@ -102,10 +102,10 @@ namespace ottimis\phplibs;
 					$z = "";
 					foreach ($ar as $k => $v) {
 						$z .= ($z != "") ? ",":"";
-						if (strtolower(substr($v, 0, 5)) !== "now()") {
+						if ($v !== "now()") {
 							$z .= $k . "='" . $db->real_escape_string($v) . "'";
 						} else {
-							$z .= $k . "=" . $v . "";
+							$z .= $k . "=now()";
 						}
 					}
 					$sql = sprintf("UPDATE %s SET %s WHERE %s='%s'", $table, $z, $idfield, $idvalue);
@@ -176,20 +176,19 @@ namespace ottimis\phplibs;
                     switch ($key) {
 						case 'where':
 							foreach ($value as $k => $v) {
+								if (!isset($ar[$key]))	{
+									$ar[$key] = '';
+								}
 								if (!isset($v['operator'])) {
-									if (isset($ar[$key]))
-										$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
-									else {
-										$ar[$key] = '';
-										$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+									$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+								} else if ($v['operator'] === 'IN')	{
+									$inValues = array();
+									foreach ($v['value'] as $kIN => $vIN) {
+										$inValues[] = "'" . $db->real_escape_string($vIN) . "'";
 									}
+									$ar[$key] .= sprintf("IN(%s)", implode(',', $inValues));
 								} else {
-									if (isset($ar[$key]))
-										$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
-									else {
-										$ar[$key] = '';
-										$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
-									}
+									$ar[$key] .= sprintf("%s%s'%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
 								}
 								if (isset($v['operatorAfter']))	{
 									if (isset($value[$k + 1]))
@@ -197,34 +196,28 @@ namespace ottimis\phplibs;
 								}
 							}
 							break;
-                        case 'join':
+						case 'join':
+							if (!isset($ar[$key]))	{
+								$ar[$key] = '';
+							}
                             foreach ($value as $v) {
-								if (isset($ar[$key]))
-									$ar[$key] .= sprintf("LEFT JOIN %s ON %s \r", $v[0], $v[1]);
-								else {
-									$ar[$key] = '';
-									$ar[$key] .= sprintf("LEFT JOIN %s ON %s \r", $v[0], $v[1]);
-								}
+								$ar[$key] .= sprintf("LEFT JOIN %s ON %s ", $v[0], $v[1]);
                             }
                             break;
-                        case 'limit':
-                            if (isset($ar[$key]))
-								$ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
-							else {
+						case 'limit':
+							if (!isset($ar[$key]))	{
 								$ar[$key] = '';
-								$ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
 							}
+							$ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
                             break;
 
                         default:
                             if (gettype($value) == 'array') {
+								if (!isset($ar[$key]))	{
+									$ar[$key] = '';
+								}
                                 foreach ($value as $v) {
-                                    if (isset($ar[$key]))
-										$ar[$key] .= $v .= ', ';
-									else	{
-										$ar[$key] = '';
-										$ar[$key] .= $v .= ', ';
-									}
+									$ar[$key] .= $v .= ', ';
                                 }
                                 $ar[$key] = substr($ar[$key], 0, -2);
                             } else {
@@ -239,12 +232,7 @@ namespace ottimis\phplibs;
 
             if (isset($req['select'])) {
                 $sql = sprintf(
-                    "SELECT %s %s
-						FROM %s
-						%s
-						%s
-						%s
-						%s %s",
+                    "SELECT %s %s FROM %s %s %s %s %s %s",
 					isset($req['count']) ? "SQL_CALC_FOUND_ROWS " : '',
                     $ar['select'],
                     $ar['from'],
@@ -255,10 +243,7 @@ namespace ottimis\phplibs;
                     isset($ar['other']) ? $ar['other'] : ''
                 );
             }	else if(isset($req['delete']))	{
-				$sql = sprintf("DELETE
-						FROM %s
-						WHERE %s
-						%s",
+				$sql = sprintf("DELETE FROM %s WHERE %s %s",
 						$ar['from'],
 						isset($ar['where']) ? "WHERE " . $ar['where'] : '',
 						$ar['other']);
@@ -283,9 +268,6 @@ namespace ottimis\phplibs;
                     unset($ret['data']);
 				}
 				$db->freeresult();
-				// if (sizeof($ret['data']) == 1)
-				// 	return $ret['data'][0];
-				// else
 				return $ret;
 			} else {
 				$log = new Logger();
@@ -293,41 +275,7 @@ namespace ottimis\phplibs;
 				$db->freeresult();
 				return false;
 			}
-
         }
-
-		function outSend( $errorCode, $data = "", $error = "", $num_check = true ) {
-			header("HTTP/1.1 " . $errorCode . ' ' . $this->httpCodes[$errorCode]);
-			if( $error != "" )
-				$ret['err'] = $error;
-			if( $data != "" )
-				$ret['data'] = $data;
-			if ($num_check)
-				echo utf8_encode( json_encode( $ret, JSON_NUMERIC_CHECK ) );
-			else
-				echo utf8_encode( json_encode( $ret ) );
-			exit;
-		}
-
-		/**
-		 * logme
-		 *
-		 * @param  string $s
-		 * @param  boolean $berror
-		 *
-		 * @return void
-		 */
-		function logme( $s, $berror = false ) {
-			
-			$dt = date( "Ymd", time() );
-			$tm = date( "H:i:s", time() );
-
-			if (!$berror)
-				$sFile = sprintf( "logs/%s.txt", $dt );
-			else
-				$sFile = sprintf("logs/%s_error.txt", $dt);
-			file_put_contents( $sFile, $tm . " - " . $s . "\r\n", FILE_APPEND ); 
-		}
 
 		function _combo_list( $req, $where = "", $log = false ) {
 			$table = $req['table'];
@@ -361,27 +309,6 @@ namespace ottimis\phplibs;
 				$ar[] = $rec;
 			}
 			return $ar;
-		}
-
-		/**
-		 * getParams
-		 *
-		 * @param  boolean $debug
-		 *
-		 * @return void
-		 */
-		function getParams($debug = false)	{
-			$data = json_decode(file_get_contents("php://input"), true);
-			$req = $_POST;
-			$req = array_merge($req, $_GET);
-
-			if ($data != null) {
-				$req = array_merge($req, $data);
-			}
-			if ($debug)	{
-				$this->logme("getParams --> " . json_encode($req));
-			}
-			return $req;
 		}
 	}
 ?>

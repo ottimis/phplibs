@@ -64,7 +64,8 @@ namespace ottimis\phplibs;
 		}
 
 		function freeresult() {
-			return(mysqli_free_result($this->result));
+			if ($this->result)
+				return $this->result->free();
 		}
 
 		function real_escape_string($param)	{

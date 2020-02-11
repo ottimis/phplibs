@@ -171,6 +171,7 @@ namespace ottimis\phplibs;
                 if (sizeof($arrSql['data']) == 1) {
                     $arrSql[] = $arrSql;
                 }
+                $ret = '';
                 foreach ($arrSql['data'] as $value) {
                     $ret .= self::prepareHtml($value);
                 }
@@ -183,6 +184,7 @@ namespace ottimis\phplibs;
 
         private static function prepareHtml($log)
         {
+            $text = '';
             $text .= "<b>" . date( "d-m-Y - H:i:s", strtotime( $log['datetime'] ) ) . "</b>";
             if ($log['code'] != "")
                 $text .= " - Code: <b>" . $log['code'] . "</b>";
