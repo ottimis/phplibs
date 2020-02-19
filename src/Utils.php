@@ -284,11 +284,12 @@ namespace ottimis\phplibs;
 		}
 		
 		private function buildPaging( $ar, $paging, $params )  {
-            if (isset($paging['s']) && strlen($paging['s'] > 1) && isset($paging['searchField']))    {
+            if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchField']))    {
                 $searchWhere = array();
                 foreach ($paging['searchField'] as $k => $v)  {
                     $searchWhere[] = "$v like :s$k";
-                    $params["s$k"] = $paging['s'];
+                    $params["s$k"] = "%" . $paging['s'] . "%";
+
                 }
                 $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
                 if (isset($ar['where']))    {

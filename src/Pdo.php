@@ -277,27 +277,26 @@ namespace ottimis\phplibs;
             }
         }
 
-        private function buildPaging($ar, $paging, $params)
-        {
-            if (isset($paging['s']) && strlen($paging['s'] > 1) && isset($paging['searchField'])) {
+        private function buildPaging( $ar, $paging, $params )  {
+            if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchField']))    {
                 $searchWhere = array();
-                foreach ($paging['searchField'] as $k => $v) {
+                foreach ($paging['searchField'] as $k => $v)  {
                     $searchWhere[] = "$v like :s$k";
-                    $params["s$k"] = $paging['s'];
+                    $params["s$k"] = "%" . $paging['s'] . "%";
                 }
-                $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
-                if (isset($ar['where'])) {
+                $stringSearch = implode(' OR ', $searchWhere);
+                if (isset($ar['where']))    {
                     $ar['where'] .= "AND ($stringSearch)";
                 } else {
-                    $ar['where'] = "WHERE ($stringSearch)";
+                    $ar['where'] = "($stringSearch)";
                 }
             }
-            if (isset($paging['srt']) && isset($paging['o'])) {
+            if (isset($paging['srt']) && isset($paging['o']))    {
                 $ar["order"] = $paging['srt'] . " " . $paging['o'];
             }
-            if (isset($paging['p']) && isset($paging['c'])) {
-                $count = $paging['c'] != "" ? ($paging['c']) : 20;
-                $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
+            if (isset( $paging['p'] ) && isset( $paging['c'] ) ) {
+                $count = $paging['c'] != "" ? ( $paging['c'] ) : 20;
+                $start = $paging['p'] != "" ? ( $paging['p']-1 ) * $count : 0;
                 $ar["pageLimit"] = "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY";
             }
             return array("sql" => $ar, "params" => $params);
