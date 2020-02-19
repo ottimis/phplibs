@@ -166,7 +166,7 @@ namespace ottimis\phplibs;
          * @return Array
          */
 
-        function dbSelect($req)
+        function dbSelect( $req, $paging = array() )
         {
 			$db = $this->dataBase;
 			$ar = array();
@@ -228,6 +228,12 @@ namespace ottimis\phplibs;
                 } else {
                     $ar[$key] = '';
                 }
+			}
+			
+			if (sizeof($paging) > 0)    {
+                $res = $this->buildPaging($ar, $paging, $params);
+                $ar = $res['sql'];
+                $params = $res['params'];
             }
 
             if (isset($req['select'])) {
@@ -275,6 +281,31 @@ namespace ottimis\phplibs;
 				$db->freeresult();
 				return false;
 			}
+		}
+		
+		private function buildPaging( $ar, $paging, $params )  {
+            if (isset($paging['s']) && strlen($paging['s'] > 1) && isset($paging['searchField']))    {
+                $searchWhere = array();
+                foreach ($paging['searchField'] as $k => $v)  {
+                    $searchWhere[] = "$v like :s$k";
+                    $params["s$k"] = $paging['s'];
+                }
+                $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
+                if (isset($ar['where']))    {
+                    $ar['where'] .= "AND ($stringSearch)";
+                } else {
+                    $ar['where'] = "WHERE ($stringSearch)";
+                }
+            }
+            if (isset($paging['srt']) && isset($paging['o']))    {
+                $ar["order"] = $paging['srt'] . " " . $paging['o'];
+            }
+            if (isset( $paging['p'] ) && isset( $paging['c'] ) ) {
+                $count = $paging['c'] != "" ? ( $paging['c'] ) : 20;
+                $start = $paging['p'] != "" ? ( $paging['p']-1 ) * $count : 0;
+                $ar["limit"] = [$start, $count];
+            }
+            return array("sql" => $ar, "params" => $params);
         }
 
 		function _combo_list( $req, $where = "", $log = false ) {

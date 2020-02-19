@@ -148,7 +148,7 @@ namespace ottimis\phplibs;
          * @return Array
          */
 
-        public function dbSelect($req)
+        public function dbSelect($req, $paging = array())
         {
             $ar = array();
             $params = array();
@@ -222,15 +222,22 @@ namespace ottimis\phplibs;
                 }
             }
 
+            if (sizeof($paging) > 0) {
+                $res = $this->buildPaging($ar, $paging, $params);
+                $ar = $res['sql'];
+                $params = $res['params'];
+            }
+
             if (isset($req['select'])) {
                 $sql = sprintf(
-                    "SELECT %s %s FROM %s %s %s %s %s",
+                    "SELECT %s %s FROM %s %s %s %s %s %s",
                     isset($ar['limit']) ? $ar['limit'] : '',
                     $ar['select'],
                     $ar['from'],
                     isset($ar['join']) ? $ar['join'] : '',
                     isset($ar['where']) ? "WHERE " . $ar['where'] : '',
                     isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
+                    isset($ar['pageLimit']) ? $ar['pageLimit'] : '',
                     isset($ar['other']) ? $ar['other'] : ''
                 );
             } elseif (isset($req['delete'])) {
@@ -245,6 +252,7 @@ namespace ottimis\phplibs;
             if (isset($req['log'])) {
                 // $log = new Logger();
                 // $log->log("Query: " . $sql, "DBSLC1");
+                echo "Query: " . $sql;
             }
             $this->prepare($sql);
             $this->execute($params);
@@ -267,5 +275,31 @@ namespace ottimis\phplibs;
                 // $db->freeresult();
                 return $errors;
             }
+        }
+
+        private function buildPaging($ar, $paging, $params)
+        {
+            if (isset($paging['s']) && strlen($paging['s'] > 1) && isset($paging['searchField'])) {
+                $searchWhere = array();
+                foreach ($paging['searchField'] as $k => $v) {
+                    $searchWhere[] = "$v like :s$k";
+                    $params["s$k"] = $paging['s'];
+                }
+                $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
+                if (isset($ar['where'])) {
+                    $ar['where'] .= "AND ($stringSearch)";
+                } else {
+                    $ar['where'] = "WHERE ($stringSearch)";
+                }
+            }
+            if (isset($paging['srt']) && isset($paging['o'])) {
+                $ar["order"] = $paging['srt'] . " " . $paging['o'];
+            }
+            if (isset($paging['p']) && isset($paging['c'])) {
+                $count = $paging['c'] != "" ? ($paging['c']) : 20;
+                $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
+                $ar["pageLimit"] = "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY";
+            }
+            return array("sql" => $ar, "params" => $params);
         }
     }

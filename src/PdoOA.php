@@ -309,7 +309,7 @@ namespace ottimis\phplibs;
             $arClient = array(
                 "name" => $client['name'],
                 "client_id" => $client['client_id'],
-                "redirect_uri" => $client['redirect_uri']
+                "redirect_uri" => trim($client['redirect_uri'])
             );
 
             if ($id_client == 0) {
