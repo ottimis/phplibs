@@ -14,7 +14,7 @@ namespace ottimis\phplibs;
         protected $result= false;
         protected $error_reporting = true;
 
-        public function __construct($db = '', $error = false)
+        public function __construct($error = false, $db = '')
         {
             $this->host = ($db !== '') ? getenv('DB_HOST_' . $db) : getenv('DB_HOST');
             $this->user = ($db !== '') ? getenv('DB_USER_' . $db) : getenv('DB_USER');
@@ -95,7 +95,7 @@ namespace ottimis\phplibs;
                 $this->execute($ar);
                 $errors = $this->error();
 
-                if ($errors[0] === 0) {
+                if (intval($errors[0]) === 0) {
                     $ret['affectedRows'] = $this->affectedRows();
                     $ret['id'] = $this->insert_id();
                     $ret['success'] = 1;
@@ -171,12 +171,14 @@ namespace ottimis\phplibs;
                                     $ar[$key] .= sprintf("%s = :%s", $v['field'], $v['bindField']);
                                     $params[$v['bindField']] = $v['value'];
                                 } elseif ($v['operator'] === 'IN') {
-                                    $inValues = array();
-                                    foreach ($v['value'] as $kIN => $vIN) {
-                                        $inValues[] = ":in$kIN";
-                                        $params["in$kIN"] = $vIN;
+                                    if (sizeof($v['value']) > 0) {
+                                        $inValues = array();
+                                        foreach ($v['value'] as $kIN => $vIN) {
+                                            $inValues[] = ":in$kIN";
+                                            $params["in$kIN"] = $vIN;
+                                        }
+                                        $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
                                     }
-                                    $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
                                 } else {
                                     $ar[$key] .= sprintf("%s %s :%s", $v['field'], $v['operator'], $v['bindField']);
                                     $params[$v['bindField']] = $v['value'];
@@ -235,7 +237,7 @@ namespace ottimis\phplibs;
                     $ar['select'],
                     $ar['from'],
                     isset($ar['join']) ? $ar['join'] : '',
-                    isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    sizeof($ar['where']) > 0 ? "WHERE " . $ar['where'] : '',
                     isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
                     isset($ar['pageLimit']) ? $ar['pageLimit'] : '',
                     isset($ar['other']) ? $ar['other'] : ''
@@ -253,6 +255,7 @@ namespace ottimis\phplibs;
                 // $log = new Logger();
                 // $log->log("Query: " . $sql, "DBSLC1");
                 echo "Query: " . $sql;
+                print_r($params);
             }
             $this->prepare($sql);
             $this->execute($params);
@@ -277,26 +280,27 @@ namespace ottimis\phplibs;
             }
         }
 
-        private function buildPaging( $ar, $paging, $params )  {
-            if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchField']))    {
+        private function buildPaging($ar, $paging, $params)
+        {
+            if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchField'])) {
                 $searchWhere = array();
-                foreach ($paging['searchField'] as $k => $v)  {
+                foreach ($paging['searchField'] as $k => $v) {
                     $searchWhere[] = "$v like :s$k";
                     $params["s$k"] = "%" . $paging['s'] . "%";
                 }
                 $stringSearch = implode(' OR ', $searchWhere);
-                if (isset($ar['where']))    {
+                if (isset($ar['where'])) {
                     $ar['where'] .= "AND ($stringSearch)";
                 } else {
                     $ar['where'] = "($stringSearch)";
                 }
             }
-            if (isset($paging['srt']) && isset($paging['o']))    {
+            if (isset($paging['srt']) && isset($paging['o'])) {
                 $ar["order"] = $paging['srt'] . " " . $paging['o'];
             }
-            if (isset( $paging['p'] ) && isset( $paging['c'] ) ) {
-                $count = $paging['c'] != "" ? ( $paging['c'] ) : 20;
-                $start = $paging['p'] != "" ? ( $paging['p']-1 ) * $count : 0;
+            if (isset($paging['p']) && isset($paging['c'])) {
+                $count = $paging['c'] != "" ? ($paging['c']) : 20;
+                $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
                 $ar["pageLimit"] = "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY";
             }
             return array("sql" => $ar, "params" => $params);
