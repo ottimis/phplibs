@@ -262,6 +262,9 @@ namespace ottimis\phplibs;
 
 			$res = $db->query($sql);
 			if ($res)	{
+                if (isset($req['delete'])) {
+					return array("success" => true);
+                }
 				$ret = array();
 				while ($rec = $db->fetchassoc()) {
 					$ret['data'][] = $rec;
