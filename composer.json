@@ -1,6 +1,6 @@
 {
     "name": "ottimis/phplibs",
-    "version": "1.7.8",
+    "version": "1.7.9",
     "keywords": ["release", "official"],
     "description": "Php Library",
     "autoload": {

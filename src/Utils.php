@@ -249,7 +249,7 @@ namespace ottimis\phplibs;
                     isset($ar['other']) ? $ar['other'] : ''
                 );
             }	else if(isset($req['delete']))	{
-				$sql = sprintf("DELETE FROM %s WHERE %s %s",
+				$sql = sprintf("DELETE FROM %s %s %s",
 						$ar['from'],
 						isset($ar['where']) ? "WHERE " . $ar['where'] : '',
 						$ar['other']);
