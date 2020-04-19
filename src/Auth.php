@@ -83,7 +83,7 @@ use Firebase\JWT\JWT;
         /**
          * get access token from header
          * */
-        protected function getBearerToken()
+        public function getBearerToken()
         {
             $headers = $this->getAuthorizationHeader();
                 
