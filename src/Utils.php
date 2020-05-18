@@ -179,6 +179,14 @@ namespace ottimis\phplibs;
 								if (!isset($ar[$key]))	{
 									$ar[$key] = '';
 								}
+								if( isset($v['custom'] ) ) {
+									$ar[$key] .= $v['custom'];
+									if (isset($v['operatorAfter']))	{
+										if (isset($value[$k + 1]))
+											$ar[$key] .= sprintf(" %s ",$v['operatorAfter']);
+									}
+									continue;
+								}
 								if (!isset($v['operator'])) {
 									$ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
 								} else if ($v['operator'] === 'IN')	{
