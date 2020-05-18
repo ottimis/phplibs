@@ -4,6 +4,7 @@ namespace ottimis\phplibs;
 
     use Psr\Http\Message\ResponseInterface as Response;
     use Psr\Http\Message\ServerRequestInterface as Request;
+    use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
     use Slim\Routing\RouteCollectorProxy as RouteCollectorProxy;
 
     /**
@@ -62,11 +63,34 @@ namespace ottimis\phplibs;
         const ERRORS = 3;
         public $dataBase;
 
-        function __construct() {
+        public function __construct()
+        {
             $this->dataBase = new dataBase();
         }
 
-        public function log( $note, $code = NULL )   {
+        private static function get_client_ip()
+        {
+            $ipaddress = '';
+            if (getenv('HTTP_CLIENT_IP')) {
+                $ipaddress = getenv('HTTP_CLIENT_IP');
+            } elseif (getenv('HTTP_X_FORWARDED_FOR')) {
+                $ipaddress = getenv('HTTP_X_FORWARDED_FOR');
+            } elseif (getenv('HTTP_X_FORWARDED')) {
+                $ipaddress = getenv('HTTP_X_FORWARDED');
+            } elseif (getenv('HTTP_FORWARDED_FOR')) {
+                $ipaddress = getenv('HTTP_FORWARDED_FOR');
+            } elseif (getenv('HTTP_FORWARDED')) {
+                $ipaddress = getenv('HTTP_FORWARDED');
+            } elseif (getenv('REMOTE_ADDR')) {
+                $ipaddress = getenv('REMOTE_ADDR');
+            } else {
+                $ipaddress = 'UNKNOWN';
+            }
+            return $ipaddress;
+        }
+
+        public function log($note, $code = null)
+        {
             $utils = new Utils();
 
             $db = $this->dataBase;
@@ -76,14 +100,15 @@ namespace ottimis\phplibs;
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
-            if ($ret != false)    {
+            if ($ret != false) {
                 return $ret['id'];
             } else {
                 $this->error('Fallito log', 'LOG1');
             }
         }
 
-        public function warning( $note, $code = NULL )   {
+        public function warning($note, $code = null)
+        {
             $utils = new Utils();
             
             $db = $this->dataBase;
@@ -94,14 +119,15 @@ namespace ottimis\phplibs;
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
-            if ($ret != false)    {
+            if ($ret != false) {
                 return $ret['id'];
             } else {
                 $this->error('Fallito warning', 'LOG2');
             }
         }
 
-        public function error( $note, $code = NULL )   {
+        public function error($note, $code = null)
+        {
             $utils = new Utils();
 
             $db = $this->dataBase;
@@ -112,7 +138,7 @@ namespace ottimis\phplibs;
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
-            if ($ret != false)    {
+            if ($ret != false) {
                 return $ret['id'];
             } else {
                 throw new \Exception("Errore nella registrazione dell'errore... Brutto!", 1);
@@ -132,6 +158,7 @@ namespace ottimis\phplibs;
             $utils = new Utils();
 
             $arSql = array(
+                "log" => true,
                 "select" => ["l.*", "lt.color", "lt.log_type"],
                 "from" => "logs l",
                 "join" => [
@@ -143,21 +170,16 @@ namespace ottimis\phplibs;
                 "order" => "id desc"
             );
 
+            if (isset($req['where'])) {
+                $arSql['where'] = $req['where'];
+            }
+
             if (isset($req['type'])) {
                 $arSql['where'] = array(
                     array(
                         "field" => "type",
                         "value" => $req['type'],
                     )
-                );
-            }
-
-            if (isset($req['datetime']) && isset($req['type'])) {
-                $arrSql['where'][0]['operatorAfter'] = "AND";
-                $arrSql['where'][] = array(
-                    "field" => "datetime",
-                    "operator" => ">",
-                    "value" => $req['datetime']
                 );
             }
 
@@ -185,9 +207,10 @@ namespace ottimis\phplibs;
         private static function prepareHtml($log)
         {
             $text = '';
-            $text .= "<b>" . date( "d-m-Y - H:i:s", strtotime( $log['datetime'] ) ) . "</b>";
-            if ($log['code'] != "")
+            $text .= "<b>" . date("d-m-Y - H:i:s", strtotime($log['datetime'])) . "</b>";
+            if ($log['code'] != "") {
                 $text .= " - Code: <b>" . $log['code'] . "</b>";
+            }
             if ($log['note'] != "") {
                 $text .= "<br><code>" . $log['note'] . "</code> ";
             }
@@ -214,8 +237,20 @@ namespace ottimis\phplibs;
         }
 
 
-        public static function api($app)
+        public static function api($app, $secure = '')
         {
+            $secureMW = function (Request $request, RequestHandler $handler) use ($secure) {
+                $requestIp = Logger::get_client_ip();
+                if ($secure != "") {
+                    if ($secure != $requestIp) {
+                        $response = new \Slim\Psr7\Response();
+                        return $response
+                                ->withStatus(404);
+                    }
+                }
+                $response = $handler->handle($request);
+                return $response;
+            };
             $app->group('/logs', function (RouteCollectorProxy $group) {
                 $group->get('', function (Request $request, Response $response) {
                     $logs = self::listLogs();
@@ -224,61 +259,17 @@ namespace ottimis\phplibs;
                     return $response
                             ->withHeader('Content-Type', 'text/html');
                 });
-                $group->get('/today', function (Request $request, Response $response) {
-                    $logs = self::listLogs(array("datetime" => "CURDATE()"));
+                $group->get('/{code}', function (Request $request, Response $response) {
+                    $where[] = array(
+                        "field" => "code",
+                        "value" => $args['code']
+                    );
+                    $logs = self::listLogs(array("where" => $where));
 
                     $response->getBody()->write($logs);
                     return $response
                             ->withHeader('Content-Type', 'text/html');
                 });
-                $group->group('/log', function (RouteCollectorProxy $groupLog) {
-                    $groupLog->get('', function (Request $request, Response $response) {
-                        $logs = self::listLogs(array("type" => self::LOGS));
-
-                        $response->getBody()->write($logs);
-                        return $response
-                                ->withHeader('Content-Type', 'text/html');
-                    });
-                    $groupLog->get('/today', function (Request $request, Response $response) {
-                        $logs = self::listLogs(array("type" => self::LOGS, "datetime" => "CURDATE()"));
-
-                        $response->getBody()->write($logs);
-                        return $response
-                                ->withHeader('Content-Type', 'text/html');
-                    });
-                });
-                $group->group('/warning', function (RouteCollectorProxy $groupLog) {
-                    $groupLog->get('', function (Request $request, Response $response) {
-                        $logs = self::listLogs(array("type" => self::WARNINGS));
-
-                        $response->getBody()->write($logs);
-                        return $response
-                                ->withHeader('Content-Type', 'text/html');
-                    });
-                    $groupLog->get('/today', function (Request $request, Response $response) {
-                        $logs = self::listLogs(array("type" => self::WARNINGS, "datetime" => "CURDATE()"));
-
-                        $response->getBody()->write($logs);
-                        return $response
-                                ->withHeader('Content-Type', 'text/html');
-                    });
-                });
-                $group->group('/error', function (RouteCollectorProxy $groupLog) {
-                    $groupLog->get('', function (Request $request, Response $response) {
-                        $logs = self::listLogs(array("type" => self::ERRORS));
-
-                        $response->getBody()->write($logs);
-                        return $response
-                                ->withHeader('Content-Type', 'text/html');
-                    });
-                    $groupLog->get('/today', function (Request $request, Response $response) {
-                        $logs = self::listLogs(array("type" => self::ERRORS, "datetime" => "CURDATE()"));
-
-                        $response->getBody()->write($logs);
-                        return $response
-                                ->withHeader('Content-Type', 'text/html');
-                    });
-                });
-            });
+            })->add($secureMW);
         }
     }

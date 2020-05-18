@@ -28,13 +28,14 @@ namespace ottimis\phplibs;
         protected $server;
         protected $authenticationUrl = '';
 
-        public function __construct($driver = 'mysql', $serverConfig = array())
+        public function __construct($serverConfig = array(), $driver = 'mysql')
         {
             $this->dbname = 'dbname=' . getenv('DB_NAME') . ';';
             $this->host = 'host=' . getenv('DB_HOST') . ';';
             $this->username = getenv('DB_USER');
             $this->password = getenv('DB_PASSWORD');
             $this->dsn = $driver . ':' . $this->dbname . $this->host;
+
             $this->storage = new PdoOA(array('dsn' => $this->dsn, 'username' => $this->username, 'password' => $this->password));
             $this->server = new OAServer($this->storage, $serverConfig);
         }
@@ -97,6 +98,25 @@ namespace ottimis\phplibs;
             return $this->storage->getClient($client_id);
         }
 
+        public function discoveryEndpoint($app, $json)
+        {
+            $app->get('/.well-known/openid-configg', function (Request $request, Response $response) use ($json) {
+                $response->getBody()->write($json);
+                return $response
+                    ->withHeader('Content-Type', 'application/json');
+            });
+        }
+
+        public function jwkEndpoint($app, $keys)
+        {
+            $app->get('/oauth2/certs', function (Request $request, Response $response) use ($keys) {
+                $ar = array('keys' => $keys);
+                $response->getBody()->write(json_encode($ar));
+                return $response
+                    ->withHeader('Content-Type', 'application/json');
+            });
+        }
+
         public function api($app)
         {
             $app->group('/oauth2', function (RouteCollectorProxy $group) {
@@ -137,6 +157,7 @@ namespace ottimis\phplibs;
                         $success = $this->storage->verifyRequest($params['client_id'], $params['state'], true, $params['id']);
                     }
                     $this->server->handleAuthorizeRequest($request, $responseOAuth, $success, $params['id']);
+
                     return $this->response($response, $responseOAuth);
                 });
 
