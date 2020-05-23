@@ -110,7 +110,7 @@ namespace ottimis\phplibs;
         public function warning($note, $code = null)
         {
             $utils = new Utils();
-            
+
             $db = $this->dataBase;
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
@@ -145,7 +145,7 @@ namespace ottimis\phplibs;
             }
         }
 
-        
+
         /**
          * listLogs
          *
@@ -158,7 +158,6 @@ namespace ottimis\phplibs;
             $utils = new Utils();
 
             $arSql = array(
-                "log" => true,
                 "select" => ["l.*", "lt.color", "lt.log_type"],
                 "from" => "logs l",
                 "join" => [
@@ -186,7 +185,7 @@ namespace ottimis\phplibs;
             if (isset($req['limit'])) {
                 $arrSql['limit'] = aray(0, $req['limit']);
             }
-            
+
             $arrSql = $utils->dbSelect($arSql);
 
             if (!$array) {
