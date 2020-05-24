@@ -45,7 +45,7 @@ namespace ottimis\phplibs;
         }
         public function fetchall()
         {
-            return $this->result->fetchAll();
+            return $this->result->fetchAll(\PDO::FETCH_ASSOC);
         }
         public function prepare($sql)
         {

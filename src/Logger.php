@@ -236,12 +236,12 @@ namespace ottimis\phplibs;
         }
 
 
-        public static function api($app, $secure = '')
+        public static function api($app, $secure = array())
         {
             $secureMW = function (Request $request, RequestHandler $handler) use ($secure) {
                 $requestIp = Logger::get_client_ip();
-                if ($secure != "") {
-                    if ($secure != $requestIp) {
+                if (sizeof($secure) > 0) {
+                    if (!in_array($requestIp, $secure)) {
                         $response = new \Slim\Psr7\Response();
                         return $response
                                 ->withStatus(404);
