@@ -237,7 +237,7 @@ namespace ottimis\phplibs;
                     $ar['select'],
                     $ar['from'],
                     isset($ar['join']) ? $ar['join'] : '',
-                    sizeof($ar['where']) > 0 ? "WHERE " . $ar['where'] : '',
+                    isset($ar['where']) ? "WHERE " . $ar['where'] : '',
                     isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
                     isset($ar['pageLimit']) ? $ar['pageLimit'] : '',
                     isset($ar['other']) ? $ar['other'] : ''
