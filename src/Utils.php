@@ -123,11 +123,13 @@ namespace ottimis\phplibs;
 					$ret['id'] = $db->insert_id();
 					$ret['success'] = 1;
 				}
+				$db->close();
 				return $ret;
 			} catch( Exception $e ) {
 				$log = new Logger();
 		        $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
 				$ret['success'] = 0;
+				$db->close();
 				return $ret;
 			}
 
@@ -284,12 +286,12 @@ namespace ottimis\phplibs;
                     $ret['rows'] = $ret['data'];
                     unset($ret['data']);
 				}
-				$db->freeresult();
+				$db->close();
 				return $ret;
 			} else {
 				$log = new Logger();
                 $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
-				$db->freeresult();
+				$db->close();
 				return false;
 			}
 		}

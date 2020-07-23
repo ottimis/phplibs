@@ -33,6 +33,11 @@ namespace ottimis\phplibs;
         {
             return $this->conn->errorInfo();
         }
+        // chiude la connessione
+        public function close()
+        {
+            return $this->conn = null;
+        }
         // gruppo funzioni interrogazione
         public function query($sql)
         {
@@ -105,12 +110,14 @@ namespace ottimis\phplibs;
                     $ret['success'] = 0;
                     $ret['err'] = $errors;
                 }
+                $this->close();
                 return $ret;
             } catch (Exception $e) {
                 // $log = new Logger();
                 // $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
                 $ret['success'] = 0;
                 $ret['err'] = $e->getMessage();
+                $this->close();
                 return $ret;
             }
         }
@@ -271,11 +278,13 @@ namespace ottimis\phplibs;
                     $ret['rows'] = $ret['data'];
                     unset($ret['data']);
                 }
+                $this->close();
                 return $ret;
             } else {
                 // $log = new Logger();
                 // $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
                 // $db->freeresult();
+                $this->close();
                 return $errors;
             }
         }
