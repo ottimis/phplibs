@@ -183,7 +183,7 @@ namespace ottimis\phplibs;
             }
 
             if (isset($req['limit'])) {
-                $arrSql['limit'] = aray(0, $req['limit']);
+                $arSql['limit'] = array(0, $req['limit']);
             }
 
             $arrSql = $utils->dbSelect($arSql);
@@ -252,7 +252,7 @@ namespace ottimis\phplibs;
             };
             $app->group('/logs', function (RouteCollectorProxy $group) {
                 $group->get('', function (Request $request, Response $response) {
-                    $logs = self::listLogs();
+                    $logs = self::listLogs(array("limit" => 1000));
 
                     $response->getBody()->write($logs);
                     return $response
