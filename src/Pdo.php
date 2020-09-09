@@ -269,7 +269,7 @@ namespace ottimis\phplibs;
             $errors = $this->error();
             if (intval($errors[0]) === 0) {
                 $ret = array();
-                $ret['data'] = $this->fetchAll();
+                $ret['data'] = $this->fetchall();
                 if (isset($req['count'])) {
                     $countSelect = sprintf("SELECT COUNT(*) FROM %s", $ar['from']);
                     $this->query($countSelect);
