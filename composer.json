@@ -1,7 +1,10 @@
 {
     "name": "ottimis/phplibs",
-    "version": "1.7.21",
-    "keywords": ["release", "official"],
+    "version": "1.7.22",
+    "keywords": [
+        "release",
+        "official"
+    ],
     "description": "Php Library",
     "autoload": {
         "psr-4": {
