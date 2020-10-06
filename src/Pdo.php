@@ -13,6 +13,7 @@ namespace ottimis\phplibs;
         protected $conn = null;
         protected $result= false;
         protected $error_reporting = true;
+        protected $transaction = false;
 
         public function __construct($error = false, $db = '')
         {
@@ -33,10 +34,20 @@ namespace ottimis\phplibs;
         {
             return $this->conn->errorInfo();
         }
-        // chiude la connessione
-        public function close()
+        public function startTransaction()
         {
-            return $this->conn = null;
+            $this->transaction = $this->conn->beginTransaction();
+            return $this->transaction;
+        }
+        public function commitTransaction()
+        {
+            $this->transaction = !$this->conn->commit();
+            return $this->transaction;
+        }
+        public function rollBackTransaction()
+        {
+            $this->transaction = !$this->conn->rollBack();
+            return $this->transaction;
         }
         // gruppo funzioni interrogazione
         public function query($sql)
@@ -48,7 +59,7 @@ namespace ottimis\phplibs;
         {
             return $this->result->fetch();
         }
-        public function fetchall()
+        public function fetchAll()
         {
             return $this->result->fetchAll(\PDO::FETCH_ASSOC);
         }
@@ -110,14 +121,12 @@ namespace ottimis\phplibs;
                     $ret['success'] = 0;
                     $ret['err'] = $errors;
                 }
-                $this->close();
                 return $ret;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 // $log = new Logger();
                 // $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
                 $ret['success'] = 0;
                 $ret['err'] = $e->getMessage();
-                $this->close();
                 return $ret;
             }
         }
@@ -178,14 +187,12 @@ namespace ottimis\phplibs;
                                     $ar[$key] .= sprintf("%s = :%s", $v['field'], $v['bindField']);
                                     $params[$v['bindField']] = $v['value'];
                                 } elseif ($v['operator'] === 'IN') {
-                                    if (sizeof($v['value']) > 0) {
-                                        $inValues = array();
-                                        foreach ($v['value'] as $kIN => $vIN) {
-                                            $inValues[] = ":in$kIN";
-                                            $params["in$kIN"] = $vIN;
-                                        }
-                                        $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
+                                    $inValues = array();
+                                    foreach ($v['value'] as $kIN => $vIN) {
+                                        $inValues[] = ":in$kIN";
+                                        $params["in$kIN"] = $vIN;
                                     }
+                                    $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
                                 } else {
                                     $ar[$key] .= sprintf("%s %s :%s", $v['field'], $v['operator'], $v['bindField']);
                                     $params[$v['bindField']] = $v['value'];
@@ -269,7 +276,7 @@ namespace ottimis\phplibs;
             $errors = $this->error();
             if (intval($errors[0]) === 0) {
                 $ret = array();
-                $ret['data'] = $this->fetchall();
+                $ret['data'] = $this->fetchAll();
                 if (isset($req['count'])) {
                     $countSelect = sprintf("SELECT COUNT(*) FROM %s", $ar['from']);
                     $this->query($countSelect);
@@ -278,13 +285,11 @@ namespace ottimis\phplibs;
                     $ret['rows'] = $ret['data'];
                     unset($ret['data']);
                 }
-                $this->close();
                 return $ret;
             } else {
                 // $log = new Logger();
                 // $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
                 // $db->freeresult();
-                $this->close();
                 return $errors;
             }
         }
