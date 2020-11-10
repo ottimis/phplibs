@@ -133,44 +133,9 @@ namespace ottimis\phplibs;
             }
         }
 
-        
 
-        /**
-         * dbSelect
-         *
-         * @param  mixed $req SELECT, FROM, JOIN(Array), WHERE(Array), ORDER, LIMIT, OTHER
-         *
-         * Example: $ar = array(
-                    "select" => ["uid", "status"],
-                    "from" => "pso_utenti pu",
-                    "join" => [
-                        [
-                            "pso_status ps",
-                            " ps.id=pu.idstatus"
-                        ]
-                    ],
-                    "where" => [
-                        [
-                            "field" => "email",
-                            "operator" => "=",
-                            "value" => "mattymatty95@gmail.com",
-                            "operatorAfter" => "AND"
-                        ]
-                    ],
-                    "order" => "uid",
-                    "limit" => [0, 1]
-                );
-
-                print_r(dbSelect($ar));
-         *
-         * @return Array
-         */
-
-        public function dbSelect($req, $paging = array())
-        {
-            $db = $this->dataBase;
+        private function buildWhere($req) {
             $ar = array();
-
             foreach ($req as $key => $value) {
                 if (isset($req[$key])) {
                     switch ($key) {
@@ -239,6 +204,44 @@ namespace ottimis\phplibs;
                     $ar[$key] = '';
                 }
             }
+            return $ar;
+        }
+
+        /**
+         * dbSelect
+         *
+         * @param  mixed $req SELECT, FROM, JOIN(Array), WHERE(Array), ORDER, LIMIT, OTHER
+         *
+         * Example: $ar = array(
+                    "select" => ["uid", "status"],
+                    "from" => "pso_utenti pu",
+                    "join" => [
+                        [
+                            "pso_status ps",
+                            " ps.id=pu.idstatus"
+                        ]
+                    ],
+                    "where" => [
+                        [
+                            "field" => "email",
+                            "operator" => "=",
+                            "value" => "mattymatty95@gmail.com",
+                            "operatorAfter" => "AND"
+                        ]
+                    ],
+                    "order" => "uid",
+                    "limit" => [0, 1]
+                );
+
+                print_r(dbSelect($ar));
+         *
+         * @return Array
+         */
+
+        public function dbSelect($req, $paging = array())
+        {
+            $db = $this->dataBase;
+            $ar = $this->buildWhere($req);
             
             if (sizeof($paging) > 0) {
                 $res = $this->buildPaging($ar, $paging, $params);
@@ -260,8 +263,10 @@ namespace ottimis\phplibs;
                 );
             } elseif (isset($req['delete'])) {
                 $sql = sprintf(
-                    "DELETE FROM %s %s %s",
+                    "DELETE %s FROM %s %s %s %s",
+                    gettype($req['delete']) == 'string' ? $req['delete'] : '',
                     $ar['from'],
+                    isset($ar['join']) ? $ar['join'] : '',
                     isset($ar['where']) ? "WHERE " . $ar['where'] : '',
                     $ar['other']
                 );
