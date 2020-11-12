@@ -260,7 +260,7 @@ namespace ottimis\phplibs;
                 $sql = sprintf(
                     "DELETE FROM %s WHERE %s %s",
                     $ar['from'],
-                    isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    isset($ar['where']) ? $ar['where'] : '',
                     $ar['other']
                 );
             }
