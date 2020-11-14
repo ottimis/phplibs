@@ -135,6 +135,7 @@ namespace ottimis\phplibs;
 
 
         private function buildWhere($req) {
+            $db = $this->dataBase;
             $ar = array();
             foreach ($req as $key => $value) {
                 if (isset($req[$key])) {
