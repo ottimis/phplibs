@@ -69,9 +69,9 @@ namespace ottimis\phplibs;
             $this->debug = $debug;
             $this->error = $error;
             if ($debug) {
-                $this->pdo = new Pdo($error, "DEBUG");
+                $this->pdo = new PdoConnect($error, "DEBUG");
             } else {
-                $this->pdo = new Pdo($error);
+                $this->pdo = new PdoConnect($error);
             }
         }
 
@@ -157,9 +157,9 @@ namespace ottimis\phplibs;
         public static function listLogs($debug, $req = array(), $array = false)
         {
             if ($debug) {
-                $pdo = new Pdo($debug, "DEBUG");
+                $pdo = new PdoConnect($debug, "DEBUG");
             } else {
-                $pdo = new Pdo();
+                $pdo = new PdoConnect();
             }
             $arSql = array(
                 "select" => ["l.*"],
