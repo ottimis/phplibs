@@ -2,7 +2,7 @@
 
 namespace ottimis\phplibs;
 
-    class Pdo
+    class PdoConnect
     {
         protected $driver = '';
         protected $host = '';
