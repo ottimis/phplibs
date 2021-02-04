@@ -101,9 +101,10 @@ namespace ottimis\phplibs;
             );
             $ret = $db->query($sql);
             if ($ret != false) {
-                return $ret['id'];
+                return true;
             } else {
-                $this->error('Fallito log', 'LOG1');
+                $error = $db->error();
+                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         }
 
@@ -120,9 +121,10 @@ namespace ottimis\phplibs;
             );
             $ret = $db->query($sql);
             if ($ret != false) {
-                return $ret['id'];
+                return true;
             } else {
-                $this->error('Fallito warning', 'LOG2');
+                $error = $db->error();
+                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         }
 
@@ -139,9 +141,10 @@ namespace ottimis\phplibs;
             );
             $ret = $db->query($sql);
             if ($ret != false) {
-                return $ret['id'];
+                return true;
             } else {
-                throw new \Exception("Errore nella registrazione dell'errore... Brutto!", 1);
+                $error = $db->error();
+                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         }
 

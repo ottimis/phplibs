@@ -119,6 +119,7 @@ namespace ottimis\phplibs;
                     $log = new Logger();
                     $log->error('Errore inseriemnto: ' . $db->error() . " Query: " . $sql, "DBSQL");
                     $ret['success'] = 0;
+                    $ret['error'] = $db->error();
                 } else {
                     $ret['affectedRows'] = $db->affectedRows();
                     $ret['id'] = $db->insert_id();
@@ -165,9 +166,11 @@ namespace ottimis\phplibs;
                                 } else {
                                     $ar[$key] .= sprintf("%s %s '%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
                                 }
-                                if (isset($v['operatorAfter'])) {
-                                    if (isset($value[$k + 1])) {
+                                if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
+                                    if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
                                         $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
+                                    } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                        $ar[$key] .= " AND ";
                                     }
                                 }
                             }
@@ -273,7 +276,7 @@ namespace ottimis\phplibs;
                 );
             }
             
-            if (isset($req['log'])) {
+            if (isset($req['log']) && $req['log']) {
                 $log = new Logger();
                 $log->log("Query: " . $sql, "DBSLC1");
             }

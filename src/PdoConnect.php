@@ -197,9 +197,11 @@ namespace ottimis\phplibs;
                                     $ar[$key] .= sprintf("%s %s :%s", $v['field'], $v['operator'], $v['bindField']);
                                     $params[$v['bindField']] = $v['value'];
                                 }
-                                if (isset($v['operatorAfter'])) {
-                                    if (isset($value[$k + 1])) {
+                                if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
+                                    if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
                                         $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
+                                    } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                        $ar[$key] .= " AND ";
                                     }
                                 }
                             }
@@ -265,7 +267,7 @@ namespace ottimis\phplibs;
                 );
             }
             
-            if (isset($req['log'])) {
+            if (isset($req['log']) && $req['log']) {
                 // $log = new Logger();
                 // $log->log("Query: " . $sql, "DBSLC1");
                 echo "Query: " . $sql;
