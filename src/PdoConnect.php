@@ -14,6 +14,7 @@ namespace ottimis\phplibs;
         protected $result= false;
         protected $error_reporting = true;
         protected $transaction = false;
+        protected $debug = false;
 
         public function __construct($error = false, $db = '')
         {
@@ -27,6 +28,7 @@ namespace ottimis\phplibs;
             if ($error) {
                 $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
             }
+            $this->debug = $error;
             return $this->conn;
         }
         // se error_reporting attivato riporto errore
@@ -68,6 +70,11 @@ namespace ottimis\phplibs;
             $this->result = $this->conn->prepare($sql);
             return $this->result;
         }
+        public function bindValue($field, $value)
+        {
+            $this->result->bindValue($field, $value);
+            return $this->result;
+        }
         public function execute($ar)
         {
             $this->result->execute($ar);
@@ -85,6 +92,135 @@ namespace ottimis\phplibs;
         {
             return $this->conn->lastInsertId();
         }
+
+        // START: Utils functions
+
+        /**
+         * getAll
+         *
+         * @param  string $table
+         * @return void
+         */
+        public function getAll($table, $paging = [], $fields = ["*"], $where = null)
+        {
+            $arSql = array(
+                "log" => $this->debug,
+                "select" => $fields,
+                "from" => $table
+            );
+
+            if (sizeof($paging) > 0) {
+                $arSql['count'] = true;
+            }
+
+            if ($where) {
+                $arSql['where'][] = $where;
+            }
+
+            $rec = $this->dbSelect($arSql, $paging);
+            return $rec;
+        }
+
+        public function get($table, $id, $where = null, $field = "id")
+        {
+            $arSql = array(
+                "log" => $this->debug,
+                "select" => ["*"],
+                "from" => $table,
+                "where" => [
+                    [
+                        "field" => $field,
+                        "value" => $id
+                    ]
+                ]
+            );
+
+            if ($where) {
+                $arSql['where'][] = $where;
+            }
+
+            $rec = $this->dbSelect($arSql);
+            return $rec['data'][0];
+        }
+
+        public function delete($table, $id)
+        {
+            $arSql = array(
+                "log" => $this->debug,
+                "delete" => true,
+                "from" => $table,
+                "where" => [
+                    [
+                        "field" => "id",
+                        "value" => $id
+                    ]
+                ]
+            );
+
+            $rec = $this->dbSelect($arSql);
+            return $rec;
+        }
+
+        public function getRows($table, $where, $fields = ["*"], $join = null, $paging = null, $order = null)
+        {
+            $arSql = array(
+                "log" => $this->debug,
+                "select" => $fields,
+                "from" => $table,
+                "where" => isset($where['field']) ? array($where) : $where
+            );
+
+            if ($join) {
+                $arSql['join'] = $join;
+            }
+
+            if ($order) {
+                $arSql['order'] = $order;
+            }
+
+            if ($paging > 0) {
+                $arSql['count'] = true;
+                $rec = $this->dbSelect($arSql, $paging);
+                return $rec;
+            } else {
+                $rec = $this->dbSelect($arSql);
+                return $rec['data'];
+            }
+        }
+
+        public function insertRow($table, $ar = array())
+        {
+            $res = $this->dbSql(true, $table, $ar);
+            return $res;
+        }
+
+        public function updateRow($table, $ar, $field = "", $value = "")
+        {
+            $res = $this->dbSql(false, $table, $ar, $field, $value);
+            return $res;
+        }
+
+        public function deleteRow($table, $where, $fields = ["*"])
+        {
+            $arSql = array(
+                "log" => $this->debug,
+                "delete" => true,
+                "from" => $table,
+                "where" => $where
+            );
+
+            $rec = $this->dbSelect($arSql);
+            return $rec;
+        }
+
+        public function incrementId($table)
+        {
+            $sql = sprintf("UPDATE %s SET id = id + 1", $table);
+            $this->query($sql);
+            return (int)$this->getAll($table)['data'][0]['id'];
+        }
+
+        // END: Utils functions
 
         public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false)
         {
@@ -173,15 +309,27 @@ namespace ottimis\phplibs;
                 if (isset($req[$key])) {
                     switch ($key) {
                         case 'where':
+                            $index = 0;
                             foreach ($value as $k => $v) {
                                 if (!isset($ar[$key])) {
                                     $ar[$key] = '';
                                 }
+                                if (isset($v['custom'])) {
+                                    $ar[$key] .= $v['custom'];
+                                    if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
+                                        if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                            $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
+                                        } elseif (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                            $ar[$key] .= " AND ";
+                                        }
+                                    }
+                                    continue;
+                                }
                                 $subFieldPos = strrpos($v['field'], ".");
                                 if ($subFieldPos !== false) {
-                                    $v['bindField'] = substr($v['field'], $subFieldPos + 1);
+                                    $v['bindField'] = substr($v['field'], $subFieldPos + 1) . $index;
                                 } else {
-                                    $v['bindField'] = $v['field'];
+                                    $v['bindField'] = $v['field'] . $index;
                                 }
                                 if (!isset($v['operator'])) {
                                     $ar[$key] .= sprintf("%s = :%s", $v['field'], $v['bindField']);
@@ -194,16 +342,21 @@ namespace ottimis\phplibs;
                                     }
                                     $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
                                 } else {
-                                    $ar[$key] .= sprintf("%s %s :%s", $v['field'], $v['operator'], $v['bindField']);
-                                    $params[$v['bindField']] = $v['value'];
+                                    if (isset($v['value'])) {
+                                        $ar[$key] .= sprintf("%s %s :%s", $v['field'], $v['operator'], $v['bindField']);
+                                        $params[$v['bindField']] = $v['value'];
+                                    } else {
+                                        $ar[$key] .= sprintf("%s %s ", $v['field'], $v['operator']);
+                                    }
                                 }
                                 if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
                                     if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
                                         $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
-                                    } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                    } elseif (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
                                         $ar[$key] .= " AND ";
                                     }
                                 }
+                                $index++;
                             }
                             break;
                         case 'join':
@@ -218,7 +371,7 @@ namespace ottimis\phplibs;
                             if (!isset($ar[$key])) {
                                 $ar[$key] = '';
                             }
-                            $ar[$key] .= sprintf("%s %d", $value[0], $value[1]);
+                            $ar[$key] .= sprintf("OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", $value[0], $value[1]);
                             break;
 
                         default:
@@ -248,14 +401,13 @@ namespace ottimis\phplibs;
 
             if (isset($req['select'])) {
                 $sql = sprintf(
-                    "SELECT %s %s FROM %s %s %s %s %s %s",
-                    isset($ar['limit']) ? $ar['limit'] : '',
+                    "SELECT %s FROM %s %s %s %s %s %s",
                     $ar['select'],
                     $ar['from'],
                     isset($ar['join']) ? $ar['join'] : '',
                     isset($ar['where']) ? "WHERE " . $ar['where'] : '',
                     isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
-                    isset($ar['pageLimit']) ? $ar['pageLimit'] : '',
+                    isset($ar['limit']) ? $ar['limit'] : '',
                     isset($ar['other']) ? $ar['other'] : ''
                 );
             } elseif (isset($req['delete'])) {
@@ -263,20 +415,22 @@ namespace ottimis\phplibs;
                     "DELETE FROM %s WHERE %s %s",
                     $ar['from'],
                     isset($ar['where']) ? $ar['where'] : '',
-                    $ar['other']
+                    isset($ar['other']) ? $ar['other'] : ''
                 );
             }
             
             if (isset($req['log']) && $req['log']) {
-                // $log = new Logger();
-                // $log->log("Query: " . $sql, "DBSLC1");
-                echo "Query: " . $sql;
-                print_r($params);
+                $log = new LoggerPdo(DEBUG, DEBUG);
+                $log->log("Query: " . $sql, "DBSLC1");
+                $log->log("Params: " . json_encode($params), "DBSLC2");
             }
             $this->prepare($sql);
             $this->execute($params);
             $errors = $this->error();
             if (intval($errors[0]) === 0) {
+                if (isset($req['delete'])) {
+                    return true;
+                }
                 $ret = array();
                 $ret['data'] = $this->fetchAll();
                 if (isset($req['count'])) {
@@ -289,9 +443,8 @@ namespace ottimis\phplibs;
                 }
                 return $ret;
             } else {
-                // $log = new Logger();
-                // $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
-                // $db->freeresult();
+                $log = new LoggerPdo(DEBUG, DEBUG);
+                $log->warning('Errore query: ' . $sql . "\r\n DB message: " . json_encode($errors), "DBSLC3");
                 return $errors;
             }
         }
@@ -317,7 +470,7 @@ namespace ottimis\phplibs;
             if (isset($paging['p']) && isset($paging['c'])) {
                 $count = $paging['c'] != "" ? ($paging['c']) : 20;
                 $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
-                $ar["pageLimit"] = "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY";
+                $ar["limit"] = "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY";
             }
             return array("sql" => $ar, "params" => $params);
         }

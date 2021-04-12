@@ -148,9 +148,11 @@ namespace ottimis\phplibs;
                                 }
                                 if (isset($v['custom'])) {
                                     $ar[$key] .= $v['custom'];
-                                    if (isset($v['operatorAfter'])) {
-                                        if (isset($value[$k + 1])) {
+                                    if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
+                                        if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
                                             $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
+                                        } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                            $ar[$key] .= " AND ";
                                         }
                                     }
                                     continue;
@@ -164,7 +166,7 @@ namespace ottimis\phplibs;
                                     }
                                     $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
                                 } else {
-                                    $ar[$key] .= sprintf("%s %s '%s'", $v['field'], $v['operator'], $db->real_escape_string($v['value']));
+                                    $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'], $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end']);
                                 }
                                 if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
                                     if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {

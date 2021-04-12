@@ -64,7 +64,7 @@ namespace ottimis\phplibs;
         const ERRORS = 3;
         public $pdo;
 
-        public function __construct($error, $debug, $dbName = "")
+        public function __construct($error = false, $debug = false, $dbName = "")
         {
             $this->debug = $debug;
             $this->error = $error;
@@ -108,8 +108,7 @@ namespace ottimis\phplibs;
             if ($ret['success'] != false) {
                 return $ret['id'];
             } else {
-                $error = $db->error();
-                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+                $this->error('Fallito log', 'LOG1');
             }
         }
 
@@ -126,8 +125,7 @@ namespace ottimis\phplibs;
             if ($ret['success'] != false) {
                 return $ret['id'];
             } else {
-                $error = $db->error();
-                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+                $this->error('Fallito warning', 'LOG2');
             }
         }
 
@@ -144,8 +142,7 @@ namespace ottimis\phplibs;
             if ($ret['success'] != false) {
                 return $ret['id'];
             } else {
-                $error = $db->error();
-                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+                throw new \Exception("Errore nella registrazione dell'errore... Brutto!", 1);
             }
         }
 
@@ -180,8 +177,8 @@ namespace ottimis\phplibs;
             }
 
             if (isset($req['datetime']) && isset($req['type'])) {
-                $arrSql['where'][0]['operatorAfter'] = "AND";
-                $arrSql['where'][] = array(
+                $arSql['where'][0]['operatorAfter'] = "AND";
+                $arSql['where'][] = array(
                     "field" => "datetime",
                     "operator" => ">",
                     "value" => $req['datetime']
@@ -189,7 +186,7 @@ namespace ottimis\phplibs;
             }
 
             if (isset($req['limit'])) {
-                $arrSql['limit'] = array(0, $req['limit']);
+                $arSql['limit'] = array(0, $req['limit']);
             }
             
             $arrSql = $pdo->dbSelect($arSql);
@@ -258,7 +255,7 @@ namespace ottimis\phplibs;
             };
             $app->group('/logs', function (RouteCollectorProxy $group) use ($debug) {
                 $group->get('', function (Request $request, Response $response) use ($debug) {
-                    $logs = self::listLogs($debug, array());
+                    $logs = self::listLogs($debug, array("limit" => 1000));
 
                     $response->getBody()->write($logs);
                     return $response
