@@ -140,7 +140,7 @@ namespace ottimis\phplibs;
             }
 
             $rec = $this->dbSelect($arSql);
-            return $rec['data'][0];
+            return sizeof($rec['data']) > 0 ? $rec['data'][0] : [];
         }
 
         public function delete($table, $id)
