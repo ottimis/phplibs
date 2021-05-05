@@ -64,9 +64,9 @@ namespace ottimis\phplibs;
             510 => 'Not Extended'
         );
 
-        public function __construct()
+        public function __construct($dbname)
         {
-            $this->dataBase = new dataBase();
+            $this->dataBase = new dataBase($dbname);
         }
 
 
@@ -327,7 +327,7 @@ namespace ottimis\phplibs;
                 }
                 $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
                 if (isset($ar['where'])) {
-                    $ar['where'] .= "AND ($stringSearch)";
+                    $ar['where'] .= " AND ($stringSearch)";
                 } else {
                     $ar['where'] = "WHERE ($stringSearch)";
                 }

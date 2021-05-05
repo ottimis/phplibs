@@ -15,12 +15,12 @@ namespace ottimis\phplibs;
 		protected $error_reporting = true;
 
 
-		function __construct()	{
-			$this->host = getenv('DB_HOST');
-			$this->user = getenv('DB_USER');
-			$this->password = getenv('DB_PASSWORD');
-			$this->database = getenv('DB_NAME');
-			$this->port = getenv('DB_PORT') ? getenv('DB_PORT') : 3306;
+		function __construct($dbname)	{
+			$this->host = ($dbname == "" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
+            $this->user = ($dbname == "" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
+            $this->password = ($dbname == "" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));
+            $this->database = ($dbname == "" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
+            $this->port = ($dbname == "" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
 
 			$this->conn = mysqli_connect( $this->host, $this->user, $this->password, $this->database, $this->port ) or die ("Could not connect " . mysqli_connect_error($this->conn));
 			$this->result = mysqli_query($this->conn, "SET character_set_results = 'utf8', character_set_client = 'utf8', character_set_connection = 'utf8', character_set_database = 'utf8', character_set_server = 'utf8'");

@@ -459,7 +459,7 @@ namespace ottimis\phplibs;
                 }
                 $stringSearch = implode(' OR ', $searchWhere);
                 if (isset($ar['where'])) {
-                    $ar['where'] .= "AND ($stringSearch)";
+                    $ar['where'] .= " AND ($stringSearch)";
                 } else {
                     $ar['where'] = "($stringSearch)";
                 }
