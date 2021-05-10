@@ -15,7 +15,7 @@ namespace ottimis\phplibs;
 		protected $error_reporting = true;
 
 
-		function __construct($dbname)	{
+		function __construct($dbname = "")	{
 			$this->host = ($dbname == "" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
             $this->user = ($dbname == "" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
             $this->password = ($dbname == "" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));

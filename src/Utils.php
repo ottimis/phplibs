@@ -64,7 +64,7 @@ namespace ottimis\phplibs;
             510 => 'Not Extended'
         );
 
-        public function __construct($dbname)
+        public function __construct($dbname = "")
         {
             $this->dataBase = new dataBase($dbname);
         }
