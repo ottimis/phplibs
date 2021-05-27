@@ -1,6 +1,6 @@
 <?php
 
-use \ottimis\phplibs\LoggerPSQL;
+namespace ottimis\phplibs;
 
 class PSQL
 {
