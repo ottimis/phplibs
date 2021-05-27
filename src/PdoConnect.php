@@ -252,14 +252,14 @@ namespace ottimis\phplibs;
                     $ret['id'] = $this->insert_id();
                     $ret['success'] = 1;
                 } else {
-                    // $log = new Logger();
-                    // $log->error('Errore inseriemnto: ' . $this->error() . " Query: " . $sql, "DBSQL");
+                    $log = new LoggerPdo();
+                    // $log->error('Errore inserimento: ' . $this->error() . " Query: " . $sql, "DBSQL");
                     $ret['success'] = 0;
                     $ret['err'] = $errors;
                 }
                 return $ret;
             } catch (\Exception $e) {
-                // $log = new Logger();
+                $log = new LoggerPdo();
                 // $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
                 $ret['success'] = 0;
                 $ret['err'] = $e->getMessage();

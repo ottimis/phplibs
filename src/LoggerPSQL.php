@@ -108,7 +108,7 @@ namespace ottimis\phplibs;
             if ($ret['success'] != false) {
                 return $ret['id'];
             } else {
-                $this->error('Fallito log', 'LOG1');
+                throw new \Exception($ret['err'], 1);
             }
         }
 
@@ -125,7 +125,7 @@ namespace ottimis\phplibs;
             if ($ret['success'] != false) {
                 return $ret['id'];
             } else {
-                $this->error('Fallito warning', 'LOG2');
+                throw new \Exception($ret['err'], 1);
             }
         }
 
@@ -142,7 +142,7 @@ namespace ottimis\phplibs;
             if ($ret['success'] != false) {
                 return $ret['id'];
             } else {
-                throw new \Exception("Errore nella registrazione dell'errore... Brutto!", 1);
+                throw new \Exception($ret['err'], 1);
             }
         }
 
@@ -157,9 +157,9 @@ namespace ottimis\phplibs;
         public static function listLogs($debug, $req = array(), $array = false)
         {
             if ($debug) {
-                $pdo = new PdoConnect($debug, "DEBUG");
+                $pdo = new PSQL($debug, "DEBUG");
             } else {
-                $pdo = new PdoConnect();
+                $pdo = new PSQL();
             }
             $arSql = array(
                 "select" => ["l.*"],

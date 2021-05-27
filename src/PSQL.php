@@ -2,6 +2,8 @@
 
 namespace ottimis\phplibs;
 
+use \ottimis\phplibs\LoggerPSQL;
+
 class PSQL
 {
     protected $driver = '';
@@ -24,10 +26,14 @@ class PSQL
         $this->database = ($db !== '') ? getenv('DB_NAME_' . $db) : getenv('DB_NAME');
         $this->port = ($db !== '') ? getenv('DB_PORT_' . $db) : getenv('DB_PORT');
 
-        $this->conn = new \PDO("pgsql:host=$this->host;port=$this->port;dbname=$this->database;user=$this->user;password=$this->password");
-        if ($error) {
-            $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        try {
+            $this->conn = new \PDO("pgsql:host=$this->host;port=$this->port;dbname=$this->database;user=$this->user;password=$this->password");
+        } catch (\Exception $e) {
+            throw $e;
         }
+        // if ($error) {
+        $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        // }
         $this->debug = $error;
         return $this->conn;
     }
@@ -371,7 +377,7 @@ class PSQL
                         if (!isset($ar[$key])) {
                             $ar[$key] = '';
                         }
-                        $ar[$key] .= sprintf("LIMIT %d, OFFSET %d", $value[1], $value[0]);
+                        $ar[$key] .= sprintf("LIMIT %d OFFSET %d", $value[1], $value[0]);
                         break;
 
                     default:
@@ -470,7 +476,7 @@ class PSQL
         if (isset($paging['p']) && isset($paging['c'])) {
             $count = $paging['c'] != "" ? ($paging['c']) : 20;
             $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
-            $ar["limit"] = "LIMIT $count, OFFSET $start";
+            $ar["limit"] = "LIMIT $count OFFSET $start";
         }
         return array("sql" => $ar, "params" => $params);
     }
