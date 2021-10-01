@@ -300,7 +300,7 @@ namespace ottimis\phplibs;
                     }
                     $ret['data'][] = $rec;
                 }
-                if (isset($req['count'])) {
+                if (isset($req['count']) || sizeof($paging) > 0) {
                     $db->query("SELECT FOUND_ROWS()");
                     $ret['total'] = intval($db->fetcharray()[0]);
                     $ret['count'] = sizeof($ret['data']);
@@ -338,7 +338,7 @@ namespace ottimis\phplibs;
             if (isset($paging['p']) && isset($paging['c'])) {
                 $count = $paging['c'] != "" ? ($paging['c']) : 20;
                 $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
-                $ar["limit"] = [$start, $count];
+                $ar["limit"] = "$start, $count";
             }
             return array("sql" => $ar, "params" => $params);
         }

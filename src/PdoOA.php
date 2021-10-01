@@ -6,6 +6,8 @@ namespace ottimis\phplibs;
 
     class PdoOA extends PDO
     {
+        const PROFILE_CLAIM_VALUES  = 'name';
+
         protected function hashPassword($password)
         {
             return password_hash($password, PASSWORD_DEFAULT);
@@ -56,13 +58,30 @@ namespace ottimis\phplibs;
             }
         }
 
-        public function verifyRequest($client_id, $state, $unset = false)
+        public function successRequest($user_id, $state)
+        {
+            try {
+                $stmt = $this->db->prepare(sprintf('UPDATE %s SET user_id = :user_id WHERE state = :state', 'oauth_request'));
+                $stmt->execute(compact('user_id', 'state'));
+                return true;
+            } catch (\PDOException $e) {
+                return false;
+            } catch (Exception $e) {
+                return false;
+            }
+        }
+
+        public function verifyRequest($client_id, $state, $unset = false, $user_id = 0)
         {
             $request = $this->getRequest($client_id, $state);
             
             if (!empty($request)) {
                 if ($unset) {
-                    return $this->unsetRequest($client_id, $state);
+                    if ($request['user_id'] == $user_id) {
+                        return $this->unsetRequest($client_id, $state);
+                    } else {
+                        return false;
+                    }
                 } else {
                     return true;
                 }
@@ -218,6 +237,57 @@ namespace ottimis\phplibs;
             }
         }
 
+        /**
+         * @param mixed  $user_id
+         * @param string $claims
+         * @return array|bool
+         */
+        public function getUserClaims($user_id, $claims)
+        {
+            // echo $user_id;
+            // var_dump($claims);
+            // exit;
+            if (!$userDetails = $this->getUserDetails($user_id)) {
+                return false;
+            }
+
+            $claims = explode(' ', trim($claims));
+            $userClaims = array();
+
+            // for each requested claim, if the user has the claim, set it in the response
+            $validClaims = explode(' ', self::VALID_CLAIMS);
+            foreach ($validClaims as $validClaim) {
+                if (in_array($validClaim, $claims)) {
+                    if ($validClaim == 'address') {
+                        // address is an object with subfields
+                        $userClaims['address'] = $this->getUserClaim($validClaim, $userDetails['address'] ?: $userDetails);
+                    } else {
+                        $userClaims = array_merge($userClaims, $this->getUserClaim($validClaim, $userDetails));
+                    }
+                }
+            }
+
+            return $userClaims;
+        }
+
+        /**
+         * @param string $claim
+         * @param array  $userDetails
+         * @return array
+         */
+        protected function getUserClaim($claim, $userDetails)
+        {
+            $userClaims = array();
+            $claimValuesString = constant(sprintf('self::%s_CLAIM_VALUES', strtoupper($claim)));
+            $claimValues = explode(' ', $claimValuesString);
+
+            foreach ($claimValues as $value) {
+                $userClaims[$value] = isset($userDetails[$value]) ? $userDetails[$value] : null;
+            }
+
+            return $userClaims;
+        }
+
         // END: Users
         // START: Clients
 
@@ -272,7 +342,7 @@ namespace ottimis\phplibs;
         public function getClient($idClient)
         {
             try {
-                $sql = sprintf('SELECT client_id, client_secret, name, redirect_uri
+                $sql = sprintf('SELECT client_id, client_secret, name, redirect_uri, type
                     FROM %s
                     WHERE id = :idClient', 'oauth_clients');
                 $stmt = $this->db->prepare($sql);
