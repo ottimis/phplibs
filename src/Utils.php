@@ -257,12 +257,13 @@ namespace ottimis\phplibs;
 
             if (isset($req['select'])) {
                 $sql = sprintf(
-                    "SELECT %s %s FROM %s %s %s %s %s %s",
+                    "SELECT %s %s FROM %s %s %s %s %s %s %s",
                     isset($req['count']) ? "SQL_CALC_FOUND_ROWS " : '',
                     $ar['select'],
                     $ar['from'],
                     isset($ar['join']) ? $ar['join'] : '',
                     isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    isset($ar['group']) ? "GROUP BY " . $ar['group'] : '',
                     isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
                     isset($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
                     isset($ar['other']) ? $ar['other'] : ''
