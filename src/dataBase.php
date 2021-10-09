@@ -37,6 +37,18 @@ namespace ottimis\phplibs;
 			return (mysqli_error($this->conn)) ;
 		}
 
+		function startTransaction() {
+			mysqli_begin_transaction($this->conn);
+		}
+
+		function commitTransaction() {
+			mysqli_commit($this->conn);
+		}
+
+		function rollbackTransaction() {
+			mysqli_rollback($this->conn);
+		}
+
 		// gruppo funzioni interrogazione
 		function query($sql) {
 			$this->result = mysqli_query($this->conn, $sql);
