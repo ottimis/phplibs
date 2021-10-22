@@ -32,8 +32,8 @@ class Notify
       curl_close($ch);
 
       return array(
-          "body" => $server_output,
-          "statusCode" => $statusCode
+        "body" => $server_output,
+        "statusCode" => $statusCode
       );
     }
 }

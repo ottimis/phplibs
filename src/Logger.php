@@ -120,6 +120,7 @@ namespace ottimis\phplibs;
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
+            Notify::notify("Logger warning", array("note" => $note));
             if ($ret != false) {
                 return true;
             } else {
@@ -140,6 +141,7 @@ namespace ottimis\phplibs;
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
+            Notify::notify("Logger error", array("note" => $note));
             if ($ret != false) {
                 return true;
             } else {
