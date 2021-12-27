@@ -36,6 +36,10 @@ namespace ottimis\phplibs;
         {
             return $this->conn->errorInfo();
         }
+        public function inTransaction()
+        {
+            return $this->conn->inTransaction();
+        }
         public function startTransaction()
         {
             $this->transaction = $this->conn->beginTransaction();
