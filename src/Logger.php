@@ -163,7 +163,7 @@ namespace ottimis\phplibs;
             $utils = new Utils();
 
             $arSql = array(
-                "select" => ["l.*"],
+                "select" => ["l.*, CONVERT_TZ(l.datetime, '+00:00', '+01:00') as datetime"],
                 "from" => "logs l",
                 "order" => "id desc"
             );
