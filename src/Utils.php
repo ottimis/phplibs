@@ -126,7 +126,7 @@ namespace ottimis\phplibs;
                     $ret['success'] = 1;
                 }
                 return $ret;
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $log = new Logger();
                 $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
                 $ret['success'] = 0;
@@ -250,9 +250,8 @@ namespace ottimis\phplibs;
             $ar = $this->buildWhere($req);
             
             if (sizeof($paging) > 0) {
-                $res = $this->buildPaging($ar, $paging, $params);
+                $res = $this->buildPaging($ar, $paging);
                 $ar = $res['sql'];
-                $params = $res['params'];
             }
 
             if (isset($req['select'])) {
@@ -318,13 +317,12 @@ namespace ottimis\phplibs;
             }
         }
         
-        private function buildPaging($ar, $paging, $params)
+        private function buildPaging($ar, $paging)
         {
             if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchField'])) {
                 $searchWhere = array();
                 foreach ($paging['searchField'] as $k => $v) {
-                    $searchWhere[] = "$v like :s$k";
-                    $params["s$k"] = "%" . $paging['s'] . "%";
+                    $searchWhere[] = sprintf("$v like '%%%s%%'", $paging['s']);
                 }
                 $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
                 if (isset($ar['where'])) {
@@ -341,7 +339,7 @@ namespace ottimis\phplibs;
                 $start = $paging['p'] != "" ? ($paging['p']-1) * $count : 0;
                 $ar["limit"] = "$start, $count";
             }
-            return array("sql" => $ar, "params" => $params);
+            return array("sql" => $ar);
         }
 
         public function _combo_list($req, $where = "", $log = false)
