@@ -27,63 +27,147 @@ namespace ottimis\phplibs;
 			return $this->result;
 		}
 
-		// chiusura DB
+				
+				
+		/**
+		 * Close db connection and return mysqli_close() result
+		 *
+		 * @return bool
+		 */
 		function close() {
 			return (mysqli_close($this->conn));
 		}
 
 		// se error_reporting attivato riporto errore
+		/**
+		 * String description of the last error and return mysqli_error() result
+		 *
+		 * @return string
+		 */
 		function error() {
 			return (mysqli_error($this->conn)) ;
 		}
 
+		/**
+		 * Start a db transaction  and return mysqli_begin_transaction() result
+		 *
+		 * @return bool
+		 */
 		function startTransaction() {
 			mysqli_begin_transaction($this->conn);
 		}
 
+				
+		/**
+		 * Commits the current transaction and return mysqli_commit() result
+		 *
+		 * @return bool
+		 */
 		function commitTransaction() {
 			mysqli_commit($this->conn);
 		}
-
+		
+		/**
+		 * Rolls back current transaction and return mysqli_rollback() result
+		 *
+		 * @return bool
+		 */
 		function rollbackTransaction() {
 			mysqli_rollback($this->conn);
 		}
 
-		// gruppo funzioni interrogazione
+		// gruppo funzioni interrogazione	
+		/**
+		 * Performs a query on the database and return mysqli_query() result
+		 *
+		 * @param  string $sql
+		 *
+		 * @return object|bool
+		 */
 		function query($sql) {
 			$this->result = mysqli_query($this->conn, $sql);
 			return($this->result);
 		}
 
+		/**
+		 * Gets the number of affected rows in a previous MySQL operation 
+		 * and return mysqli_affected_rows() result
+		 *
+		 * @return string|int
+		 */
 		function affectedRows() {
 			return(mysqli_affected_rows($this->conn));
 		}
 
+		/**
+		 * Gets the number of rows in the result set and 
+		 * return mysqli_num_rows() result
+		 *
+		 * @return string|int
+		 */
 		function numrows() {
 			return(mysqli_num_rows($this->result));
 		}
 
+		/**
+		 * Fetch the next row of a result set as an object and 
+		 * return mysqli_fetch_object() result
+		 *
+		 * @return object|null|false
+		 */
 		function fetchobject() {
 			return(mysqli_fetch_object($this->result));
 		}
 
+		/**
+		 * Fetch the next row of a result set as an associative, 
+		 * a numeric array, or both and return mysqli_fetch_array() result
+		 *
+		 * @return array|null|false
+		 */
 		function fetcharray() {
 			return(mysqli_fetch_array($this->result));
 		}
 
+		/**
+		 * Fetch the next row of a result set as an associative array 
+		 * and return mysqli_fetch_assoc() result
+		 *
+		 * @return string[]|null|false
+		 */
 		function fetchassoc() {
 			return( mysqli_fetch_assoc($this->result) );
 		}
 
+		/**
+		 * Frees the memory associated with a result
+		 *
+		 * @return void
+		 */
 		function freeresult() {
 			if ($this->result)
 				return $this->result->free();
 		}
 
+		/**
+		 * Escapes special characters in a string for use in an SQL statement, 
+		 * taking into account the current charset of the connection
+		 * and return mysqli_real_escape_string() result
+		 *
+		 * @param  string $param
+		 * 
+		 * @return string
+		 */
 		function real_escape_string($param)	{
 			return(mysqli_real_escape_string($this->conn, $param));
 		}
 
+		/**
+		 * Returns the value generated for an AUTO_INCREMENT column by the last query
+		 * with mysqli_insert_id() function
+		 * 
+		 * @return int|string
+		 */
 		function insert_id()	{
 			return(mysqli_insert_id($this->conn) );
 		}

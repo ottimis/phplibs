@@ -67,7 +67,12 @@ namespace ottimis\phplibs;
         {
             $this->dataBase = new dataBase();
         }
-
+        
+        /**
+         * Return the Ip address of the Host 
+         *
+         * @return string|array|false
+         */
         private static function get_client_ip()
         {
             $ipaddress = '';
@@ -88,7 +93,16 @@ namespace ottimis\phplibs;
             }
             return $ipaddress;
         }
-
+                
+        /**
+         * This function insert into the db the log text with 
+         * value 1 on the column "type", if the insert failed it throw an Exception
+         *
+         * @param  mixed $note
+         * @param  mixed $code [optional]
+         * 
+         * @return bool|Exception
+         */
         public function log($note, $code = null)
         {
             $utils = new Utils();
@@ -107,7 +121,16 @@ namespace ottimis\phplibs;
                 throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         }
-
+        
+        /**
+         * This function insert into the db the log text with 
+         * value 2 on the column "type", if the insert failed it throw an Exception
+         *
+         * @param  mixed $note
+         * @param  mixed $code [optional]
+         * 
+         * @return bool|Exception
+         */
         public function warning($note, $code = null)
         {
             $utils = new Utils();
@@ -129,6 +152,15 @@ namespace ottimis\phplibs;
             }
         }
 
+        /**
+         * This function insert into the db the log text with 
+         * value 3 on the column "type", if the insert failed it throw an Exception
+         *
+         * @param  mixed $note
+         * @param  mixed $code [optional]
+         * 
+         * @return bool|Exception
+         */
         public function error($note, $code = null)
         {
             $utils = new Utils();
@@ -152,11 +184,12 @@ namespace ottimis\phplibs;
 
 
         /**
-         * listLogs
+         * This function reads the logs table of the db and returns a list of these
          *
-         * @param  mixed $req: type, datetime, limit
+         * @param  array $req: type, datetime, limit
+         * @param  bool $array [optional]
          *
-         * @return void
+         * @return array
          */
         public static function listLogs($req = array(), $array = false)
         {
@@ -201,7 +234,14 @@ namespace ottimis\phplibs;
                 return $arrSql;
             }
         }
-
+        
+        /**
+         * This function prepare the html code for every single row of the logs table 
+         *
+         * @param  mixed $log
+         * 
+         * @return string
+         */
         private static function prepareHtml($log)
         {
             $text = '';
@@ -218,6 +258,11 @@ namespace ottimis\phplibs;
             return "<p class=\"c-" . $log['type'] . "\">" . $text . "</p><hr>";
         }
 
+        /**
+         * This function prepare the html header for every single row of the logs table 
+         *
+         * @return string
+         */
         private static function prepareHeader()
         {
             $text = "<!doctype html>

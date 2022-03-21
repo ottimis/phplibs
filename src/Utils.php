@@ -5,6 +5,7 @@ namespace ottimis\phplibs;
     class Utils
     {
         public $dataBase;
+        public $log;
         protected $httpCodes = array(
             100 => 'Continue',
             101 => 'Switching Protocols',
@@ -67,6 +68,7 @@ namespace ottimis\phplibs;
         public function __construct($dbname = "")
         {
             $this->dataBase = new dataBase($dbname);
+            $this->log = getenv('DB_TYPE') == 'mssql' ? new LoggerPdo() : new Logger();
         }
 
 
@@ -116,7 +118,7 @@ namespace ottimis\phplibs;
                 $r = $db->query($sql);
 
                 if (!$r) {
-                    $log = new Logger();
+                    $log = $this->log; 
                     $log->error('Errore inseriemnto: ' . $db->error() . " Query: " . $sql, "DBSQL");
                     $ret['success'] = 0;
                     $ret['error'] = $db->error();
@@ -126,8 +128,8 @@ namespace ottimis\phplibs;
                     $ret['success'] = 1;
                 }
                 return $ret;
-            } catch (\Exception $e) {
-                $log = new Logger();
+            } catch (Exception $e) {
+                $log = $this->log; 
                 $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
                 $ret['success'] = 0;
                 return $ret;
@@ -279,7 +281,7 @@ namespace ottimis\phplibs;
             }
             
             if (isset($req['log']) && $req['log']) {
-                $log = new Logger();
+                $log = $this->log;  
                 $log->log("Query: " . $sql, "DBSLC1");
             }
 
@@ -310,7 +312,7 @@ namespace ottimis\phplibs;
                 $db->freeresult();
                 return $ret;
             } else {
-                $log = new Logger();
+                $log = $this->log; 
                 $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
                 $db->freeresult();
                 return false;
@@ -367,7 +369,7 @@ namespace ottimis\phplibs;
             );
             
             if ($log) {
-                $log = new Logger();
+                $log = $this->log; 
                 $log->log('Query: ' . $sql, "CL");
             }
 

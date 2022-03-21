@@ -31,67 +31,161 @@ namespace ottimis\phplibs;
             $this->debug = $error;
             return $this->conn;
         }
-        // se error_reporting attivato riporto errore
+        // se error_reporting attivato riporto errore        
+        /**
+         *  This function fetch extended error information associated with the 
+         *  last operation on the database and return the PDO::errorInfo result
+         *
+         * @return array
+         */
         public function error()
         {
             return $this->conn->errorInfo();
         }
+        /**
+         * This function Checks if inside a transaction and return the 
+         * PDO::inTransaction result
+         *
+         * @return bool
+         */
         public function inTransaction()
         {
             return $this->conn->inTransaction();
         }
+        /**
+         * This function initiates a transaction and return the 
+         * PDO::beginTransaction result
+         *
+         * @return bool
+         * @throws PDOException
+         */
         public function startTransaction()
         {
             $this->transaction = $this->conn->beginTransaction();
             return $this->transaction;
         }
+        /**
+         * This function commits a transaction and return
+         * PDO::commit result
+         *
+         * @return bool
+         * @throws PDOException
+         */
         public function commitTransaction()
         {
             $this->transaction = !$this->conn->commit();
             return $this->transaction;
         }
+        /**
+         * This function rolls back a transaction and return
+         * PDO::rollBack result
+         *
+         * @return bool
+         * @throws PDOException
+         */
         public function rollBackTransaction()
         {
             $this->transaction = !$this->conn->rollBack();
             return $this->transaction;
         }
         // gruppo funzioni interrogazione
+        /**
+         * This function prepares and executes an SQL statement
+         * and return PDO::query result
+         * 
+         * @param mixed $sql
+         * 
+         * @return PDOStatement|bool
+         */
         public function query($sql)
         {
             $this->result = $this->conn->query($sql);
             return $this->result;
         }
+        /**
+         * This function fetches the next row from a result set 
+         * 
+         * @return mixed
+         */
         public function fetchassoc()
         {
             return $this->result->fetch();
         }
+        /**
+         * This function  fetches the remaining rows from a result set  
+         * 
+         * @return array
+         */
         public function fetchAll()
         {
             return $this->result->fetchAll(\PDO::FETCH_ASSOC);
         }
+        /**
+         * This function prepares a statement for execution 
+         * and returns a statement object 
+         * 
+         * @param mixed $sql
+         * 
+         * @return PDOStatement|bool
+         */
         public function prepare($sql)
         {
             $this->result = $this->conn->prepare($sql);
             return $this->result;
         }
+        /**
+         * This function binds a value to a parameter 
+         * and return PDOStatement::bindValue result 
+         * 
+         * @param string|int $field
+         * @param mixed $value
+         * 
+         * @return bool
+         */
         public function bindValue($field, $value)
         {
             $this->result->bindValue($field, $value);
             return $this->result;
         }
+        /**
+         * This function binds a value to a parameter 
+         * and return PDOStatement::bindValue result 
+         * 
+         * @param array $ar
+         * 
+         * @return bool
+         */
         public function execute($ar)
         {
             $this->result->execute($ar);
             return $this->result;
         }
+        /**
+         * This function dump an SQL prepared command 
+         * and return PDOStatement::debugDumpParams result 
+         * 
+         * @return bool
+         */
         public function debugDumpParams()
         {
             return $this->result->debugDumpParams();
         }
+        /**
+         * This function returns the number of rows affected 
+         * by the last SQL statement 
+         * 
+         * @return int
+         */
         public function affectedRows()
         {
             return $this->result->rowCount();
         }
+        /**
+         * This function returns the ID of the last inserted 
+         * row or sequence value
+         * 
+         * @return string|false
+         */
         public function insert_id()
         {
             return $this->conn->lastInsertId();
@@ -100,10 +194,14 @@ namespace ottimis\phplibs;
         // START: Utils functions
 
         /**
-         * getAll
+         * This function returns all the results of an SQL query executed on a specific table. 
          *
          * @param  string $table
-         * @return void
+         * @param  array $paging [optional]
+         * @param  array $fields [optional]
+         * @param  mixed $where [optional]
+         * 
+         * @return array
          */
         public function getAll($table, $paging = [], $fields = ["*"], $where = null)
         {
@@ -124,7 +222,16 @@ namespace ottimis\phplibs;
             $rec = $this->dbSelect($arSql, $paging);
             return $rec;
         }
-
+        
+        /**
+         * This function returns a specific row from a database table
+         *
+         * @param  mixed $table
+         * @param  mixed $id
+         * @param  mixed $where [optional]
+         * @param  mixed $field [optional]
+         * @return void
+         */
         public function get($table, $id, $where = null, $field = "id")
         {
             $arSql = array(
@@ -146,7 +253,15 @@ namespace ottimis\phplibs;
             $rec = $this->dbSelect($arSql);
             return sizeof($rec['data']) > 0 ? $rec['data'][0] : [];
         }
-
+        
+        /**
+         * This function deletes a specific row from a database table
+         *
+         * @param  string $table
+         * @param  string|int $id
+         * 
+         * @return array
+         */
         public function delete($table, $id)
         {
             $arSql = array(
@@ -164,7 +279,21 @@ namespace ottimis\phplibs;
             $rec = $this->dbSelect($arSql);
             return $rec;
         }
-
+        
+        /**
+         * This function returns the rows from a db table with 
+         * a specified condition. Also is possible make JOIN 
+         * operation.
+         *
+         * @param  mixed $table
+         * @param  mixed $where
+         * @param  mixed $fields [optional]
+         * @param  mixed $join [optional]
+         * @param  mixed $paging [optional]
+         * @param  mixed $order [optional]
+         * 
+         * @return array
+         */
         public function getRows($table, $where, $fields = ["*"], $join = null, $paging = null, $order = null)
         {
             $arSql = array(
@@ -191,19 +320,47 @@ namespace ottimis\phplibs;
                 return $rec['data'];
             }
         }
-
+        
+        /**
+         * This function create an SQL INSERT statement and is 
+         * used to insert new records in a table.
+         * 
+         * @param  mixed $table
+         * @param  mixed $ar
+         * 
+         * @return (string|int|false)[]|(string|int|array)[]
+         */
         public function insertRow($table, $ar = array())
         {
             $res = $this->dbSql(true, $table, $ar);
             return $res;
         }
-
+        
+        /**
+         * This function create an SQL UPDATE statement and is 
+         * used to modify the existing records in a table.
+         *
+         * @param  mixed $table
+         * @param  mixed $ar
+         * @param  mixed $field 
+         * @param  mixed $value
+         * 
+         * @return (string|int|false)[]|(string|int|array)[]
+         */
         public function updateRow($table, $ar, $field = "", $value = "")
         {
             $res = $this->dbSql(false, $table, $ar, $field, $value);
             return $res;
         }
-
+        
+        /**
+         * This function create an SQL DELETE statement and is 
+         * used to delete existing records in a table.
+         * @param  mixed $table
+         * @param  mixed $where
+         * @param  mixed $fields
+         * @return void
+         */
         public function deleteRow($table, $where, $fields = ["*"])
         {
             $arSql = array(
@@ -216,7 +373,13 @@ namespace ottimis\phplibs;
             $rec = $this->dbSelect($arSql);
             return $rec;
         }
-
+        
+        /**
+         * This function is used to increment the id of a db table by one
+         *
+         * @param  mixed $table
+         * @return void
+         */
         public function incrementId($table)
         {
             $sql = sprintf("UPDATE %s SET id = id + 1", $table);
@@ -225,7 +388,8 @@ namespace ottimis\phplibs;
         }
 
         // END: Utils functions
-
+        
+        
         public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false)
         {
             $values = '';
@@ -438,8 +602,9 @@ namespace ottimis\phplibs;
                 $ret = array();
                 $ret['data'] = $this->fetchAll();
                 if (isset($req['count'])) {
-                    $countSelect = sprintf("SELECT COUNT(*) FROM %s", $ar['from']);
-                    $this->query($countSelect);
+                    $countSelect = sprintf("SELECT COUNT(*) FROM %s %s", $ar['from'], isset($ar['where']) ? "WHERE " . $ar['where'] : '');
+                    $this->prepare($countSelect);
+                    $this->execute($params); //
                     $ret['total'] = intval($this->fetchassoc()[0]);
                     $ret['count'] = sizeof($ret['data']);
                     $ret['rows'] = $ret['data'];
