@@ -5,7 +5,7 @@ namespace ottimis\phplibs;
     class Utils
     {
         public $dataBase;
-        public $log;
+        public $Log;
         protected $httpCodes = array(
             100 => 'Continue',
             101 => 'Switching Protocols',
@@ -68,7 +68,7 @@ namespace ottimis\phplibs;
         public function __construct($dbname = "")
         {
             $this->dataBase = new dataBase($dbname);
-            $this->log = getenv('DB_TYPE') == 'mssql' ? new LoggerPdo() : new Logger();
+            $this->Log = getenv('DB_TYPE') == 'mssql' ? new LoggerPdo() : new Logger();
         }
 
 
@@ -118,7 +118,7 @@ namespace ottimis\phplibs;
                 $r = $db->query($sql);
 
                 if (!$r) {
-                    $log = $this->log; 
+                    $log = $this->Log; 
                     $log->error('Errore inseriemnto: ' . $db->error() . " Query: " . $sql, "DBSQL");
                     $ret['success'] = 0;
                     $ret['error'] = $db->error();
@@ -128,8 +128,8 @@ namespace ottimis\phplibs;
                     $ret['success'] = 1;
                 }
                 return $ret;
-            } catch (Exception $e) {
-                $log = $this->log; 
+            } catch (\Exception $e) {
+                $log = $this->Log; 
                 $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
                 $ret['success'] = 0;
                 return $ret;
@@ -281,7 +281,7 @@ namespace ottimis\phplibs;
             }
             
             if (isset($req['log']) && $req['log']) {
-                $log = $this->log;  
+                $log = $this->Log;  
                 $log->log("Query: " . $sql, "DBSLC1");
             }
 
@@ -312,7 +312,7 @@ namespace ottimis\phplibs;
                 $db->freeresult();
                 return $ret;
             } else {
-                $log = $this->log; 
+                $log = $this->Log; 
                 $log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
                 $db->freeresult();
                 return false;
@@ -369,7 +369,7 @@ namespace ottimis\phplibs;
             );
             
             if ($log) {
-                $log = $this->log; 
+                $log = $this->Log; 
                 $log->log('Query: ' . $sql, "CL");
             }
 
