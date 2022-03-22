@@ -23,7 +23,6 @@ namespace ottimis\phplibs;
             $this->port = ($dbname == "" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
 
 			$this->conn = mysqli_connect( $this->host, $this->user, $this->password, $this->database, $this->port ) or die ("Could not connect " . mysqli_connect_error($this->conn));
-			$this->result = mysqli_query($this->conn, "SET character_set_results = 'utf8', character_set_client = 'utf8', character_set_connection = 'utf8', character_set_database = 'utf8', character_set_server = 'utf8'");
 			return $this->result;
 		}
 
