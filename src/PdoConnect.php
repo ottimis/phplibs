@@ -588,7 +588,7 @@ class PdoConnect
     }
 
     if (isset($req['log']) && $req['log']) {
-      if (isset(constant("DEBUG"))) {
+      if (defined("DEBUG")) {
         $debug = constant("DEBUG");
       } else {
         $debug = false;
@@ -617,7 +617,7 @@ class PdoConnect
       }
       return $ret;
     } else {
-      if (isset(constant("DEBUG"))) {
+      if (defined("DEBUG")){
         $debug = constant("DEBUG");
       } else {
         $debug = false;
