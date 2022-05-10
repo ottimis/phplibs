@@ -169,9 +169,13 @@ class PdoConnect
    * 
    * @return bool
    */
-  public function execute($ar)
+  public function execute($ar = null)
   {
-    $this->result->execute($ar);
+    if ($ar)  {
+      $this->result->execute($ar ?? null);
+    } else {
+      $this->result->execute();
+    }
     return $this->result;
   }
   /**
