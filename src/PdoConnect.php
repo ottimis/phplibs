@@ -151,6 +151,20 @@ class PdoConnect
    * This function binds a value to a parameter 
    * and return PDOStatement::bindValue result 
    * 
+   * @param string|int $field
+   * @param mixed $value
+   * 
+   * @return bool
+   */
+  public function bindParam($field, $value, $type = \PDO::PARAM_STR)
+  {
+    $this->result->bindParam($field, $value, $type);
+    return $this->result;
+  }
+  /**
+   * This function binds a value to a parameter 
+   * and return PDOStatement::bindValue result 
+   * 
    * @param array $ar
    * 
    * @return bool
