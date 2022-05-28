@@ -12,6 +12,9 @@ class Notify
 
     public static function notify($title, $data = array())
     {
+      if (getenv("NO_NOTIFY") == 1) {
+        return;
+      }
       $headers = array('Content-Type: application/json');
       $ar = array(
         "idtype" => Notify::ALERT,
