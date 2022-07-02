@@ -5,7 +5,7 @@ namespace ottimis\phplibs;
 class Utils
 {
   /**
-   * @var dataBase;
+   * @var dataBase
    */
   public $dataBase;
   /**
