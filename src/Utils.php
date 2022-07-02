@@ -304,7 +304,9 @@ class Utils
         if (isset($req['map'])) {
           $rec = $req['map']($rec);
         }
-        $ret['data'][] = $rec;
+        if ($rec) {
+          $ret['data'][] = $rec;
+        }
       }
       if (isset($req['count']) || sizeof($paging) > 0) {
         $db->query("SELECT FOUND_ROWS()");
