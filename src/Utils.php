@@ -284,6 +284,8 @@ class Utils
         $ar['select'],
         $ar['from'],
         isset($ar['join']) ? $ar['join'] : '',
+        isset($ar['rightJoin']) ? $ar['rightJoin'] : '',
+        isset($ar['innerJoin']) ? $ar['innerJoin'] : '',
         isset($ar['where']) ? "WHERE " . $ar['where'] : '',
         isset($ar['group']) ? "GROUP BY " . $ar['group'] : '',
         isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
