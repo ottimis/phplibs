@@ -192,6 +192,22 @@ class Utils
               $ar[$key] .= sprintf("LEFT JOIN %s ON %s ", $v[0], $v[1]);
             }
             break;
+          case 'rightJoin':
+            if (!isset($ar[$key])) {
+              $ar[$key] = '';
+            }
+            foreach ($value as $v) {
+              $ar[$key] .= sprintf("RIGHT JOIN %s ON %s ", $v[0], $v[1]);
+            }
+            break;
+          case 'innerJoin':
+            if (!isset($ar[$key])) {
+              $ar[$key] = '';
+            }
+            foreach ($value as $v) {
+              $ar[$key] .= sprintf("INNER JOIN %s ON %s ", $v[0], $v[1]);
+            }
+            break;
           case 'limit':
             if (!isset($ar[$key])) {
               $ar[$key] = '';
