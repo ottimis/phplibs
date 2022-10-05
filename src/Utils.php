@@ -279,7 +279,7 @@ class Utils
 
     if (isset($req['select'])) {
       $sql = sprintf(
-        "SELECT %s %s FROM %s %s %s %s %s %s %s",
+        "SELECT %s %s FROM %s %s %s %s %s %s %s %s %s",
         isset($req['count']) ? "SQL_CALC_FOUND_ROWS " : '',
         $ar['select'],
         $ar['from'],
