@@ -91,7 +91,7 @@ class dataBase
     mysqli_rollback($this->conn);
   }
 
-  // gruppo funzioni interrogazione	
+  // gruppo funzioni interrogazione
   /**
    * Performs a query on the database and return mysqli_query() result
    *
@@ -105,8 +105,22 @@ class dataBase
     return ($this->result);
   }
 
+  // gruppo funzioni interrogazione
   /**
-   * Gets the number of affected rows in a previous MySQL operation 
+   * Performs a multi query on the database and return mysqli_multi_query() result
+   *
+   * @param  string $sql
+   *
+   * @return object|bool
+   */
+  function multi_query($sql)
+  {
+    $this->result = mysqli_multi_query($this->conn, $sql);
+    return ($this->result);
+  }
+
+  /**
+   * Gets the number of affected rows in a previous MySQL operation
    * and return mysqli_affected_rows() result
    *
    * @return string|int
@@ -117,7 +131,7 @@ class dataBase
   }
 
   /**
-   * Gets the number of rows in the result set and 
+   * Gets the number of rows in the result set and
    * return mysqli_num_rows() result
    *
    * @return string|int
@@ -128,7 +142,7 @@ class dataBase
   }
 
   /**
-   * Fetch the next row of a result set as an object and 
+   * Fetch the next row of a result set as an object and
    * return mysqli_fetch_object() result
    *
    * @return object|null|false
@@ -139,7 +153,7 @@ class dataBase
   }
 
   /**
-   * Fetch the next row of a result set as an associative, 
+   * Fetch the next row of a result set as an associative,
    * a numeric array, or both and return mysqli_fetch_array() result
    *
    * @return array|null|false
@@ -150,7 +164,7 @@ class dataBase
   }
 
   /**
-   * Fetch the next row of a result set as an associative array 
+   * Fetch the next row of a result set as an associative array
    * and return mysqli_fetch_assoc() result
    *
    * @return string[]|null|false
@@ -172,12 +186,12 @@ class dataBase
   }
 
   /**
-   * Escapes special characters in a string for use in an SQL statement, 
+   * Escapes special characters in a string for use in an SQL statement,
    * taking into account the current charset of the connection
    * and return mysqli_real_escape_string() result
    *
    * @param  string $param
-   * 
+   *
    * @return string
    */
   function real_escape_string($param)
@@ -188,7 +202,7 @@ class dataBase
   /**
    * Returns the value generated for an AUTO_INCREMENT column by the last query
    * with mysqli_insert_id() function
-   * 
+   *
    * @return int|string
    */
   function insert_id()
