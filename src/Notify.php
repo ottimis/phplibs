@@ -10,7 +10,7 @@ class Notify
   {
   }
 
-  public static function notify($title, $data = array())
+  public static function notify($title, $data = array(), $serviceName = null)
   {
     if (getenv("NO_NOTIFY") == 1) {
       return;
@@ -20,7 +20,7 @@ class Notify
       "idtype" => Notify::ALERT,
       "title" => $title,
       "data" => $data,
-      "service_from" => $_SERVER['HTTP_HOST']
+      "service_from" => $serviceName ?? $_SERVER['HTTP_HOST']
     );
 
     if (empty(getenv("NOTIFY_URL"))) {
