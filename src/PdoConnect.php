@@ -109,7 +109,7 @@ class PdoConnect
    */
   public function fetchassoc()
   {
-    return $this->result->fetch();
+    return $this->result->fetch(\PDO::FETCH_ASSOC);
   }
   /**
    * This function  fetches the remaining rows from a result set  
