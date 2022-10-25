@@ -196,11 +196,7 @@ class dataBase
    */
   function real_escape_string($param)
   {
-    if ($param) {
-      return (mysqli_real_escape_string($this->conn, $param));
-    } else {
-      return $param;
-    }
+      return (mysqli_real_escape_string($this->conn, $param ?? ''));
   }
 
   /**
