@@ -372,6 +372,7 @@ class Utils
     $table = $req['table'];
     $value = $req['value'];
     $text = $req['text'];
+    $other_field = isset($req['other_field']) ? ",".$req['other_field'] : "";
     $order = $req['order'];
     $where = $req['where'];
 
@@ -380,12 +381,13 @@ class Utils
     }
 
     $sql = sprintf(
-      "SELECT %s as id, %s as text
+      "SELECT %s as id, %s as text %s
 					FROM %s
 					%s
 					ORDER BY %s",
       $value,
       $text,
+      $other_field,
       $table,
       $where,
       $order
