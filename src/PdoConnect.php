@@ -25,6 +25,7 @@ class PdoConnect
     $this->port = ($db !== '') ? getenv('DB_PORT_' . $db) : getenv('DB_PORT');
 
     $this->conn = new \PDO("sqlsrv:Server=$this->host,$this->port;Database=$this->database;TrustServerCertificate=true", "$this->user", "$this->password");
+    $this->conn->setAttribute(\PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
     if ($error) {
       $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
