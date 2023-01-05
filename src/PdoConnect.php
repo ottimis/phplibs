@@ -439,17 +439,19 @@ class PdoConnect
         $ret['id'] = $this->insert_id();
         $ret['success'] = 1;
       } else {
-        $log = new LoggerPdo();
+        // $log = new LoggerPdo();
         // $log->error('Errore inserimento: ' . $this->error() . " Query: " . $sql, "DBSQL");
-        $ret['success'] = 0;
-        $ret['err'] = $errors;
+        // $ret['success'] = 0;
+        // $ret['err'] = $errors;
+        throw new \Exception('Errore inserimento: ' . $this->error() . " Query: " . $sql, "DBSQL");
       }
       return $ret;
     } catch (\Exception $e) {
-      $log = new LoggerPdo();
+      // $log = new LoggerPdo();
       // $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
-      $ret['success'] = 0;
-      $ret['err'] = $e->getMessage();
+      // $ret['success'] = 0;
+      // $ret['err'] = $e->getMessage();
+      throw new \Exception('Eccezione db: ' . $e->getMessage(), "DBSQL");
       return $ret;
     }
   }
