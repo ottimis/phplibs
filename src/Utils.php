@@ -124,7 +124,7 @@ class Utils
       $r = $db->query($sql);
 
       if (!$r) {
-        $this->Log->error('Errore inseriemnto: ' . $db->error() . " Query: " . $sql, "DBSQL");
+        $this->Log->error('Errore inserimento: ' . $db->error() . " Query: " . $sql, "DBSQL");
         $ret['success'] = 0;
         $ret['error'] = $db->error();
       } else {
@@ -134,7 +134,7 @@ class Utils
       }
       return $ret;
     } catch (\Exception $e) {
-      $this->Log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
+      $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
       $ret['success'] = 0;
       return $ret;
     }
