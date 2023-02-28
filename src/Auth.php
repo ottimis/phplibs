@@ -158,7 +158,6 @@ use Firebase\JWT\JWT;
             
             $ar['token'] = $jwt;
             $ar['token_date'] = 'now()';
-            $ret = $utils->dbSql(true, $this->tokenTable, $ar, "", "");
             return $jwt;
         }
 
