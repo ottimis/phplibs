@@ -628,10 +628,10 @@ class PdoConnect
       $ret = array();
       $ret['data'] = $this->fetchAll();
       if (isset($req['count'])) {
-        $countSelect = sprintf("SELECT COUNT(*) FROM %s %s %s", $ar['from'], isset($ar['join']) ? $ar['join'] : '', isset($ar['where']) ? "WHERE " . $ar['where'] : '');
+        $countSelect = sprintf("SELECT COUNT(*) AS tot FROM %s %s %s", $ar['from'], isset($ar['join']) ? $ar['join'] : '', isset($ar['where']) ? "WHERE " . $ar['where'] : '');
         $this->prepare($countSelect);
-        $this->execute($params); //
-        $ret['total'] = intval($this->fetchassoc()[0]);
+        $this->execute($params);
+        $ret['total'] = intval($this->fetchassoc()['tot']);
         $ret['count'] = sizeof($ret['data']);
         $ret['rows'] = $ret['data'];
         unset($ret['data']);
