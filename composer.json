@@ -1,6 +1,6 @@
 {
     "name": "ottimis/phplibs",
-    "version": "1.23.2",
+    "version": "2.0.0",
     "keywords": [
         "release",
         "official",
@@ -13,8 +13,10 @@
         }
     },
     "require": {
-        "firebase/php-jwt": "^5.0",
-        "slim/slim": "4.10.0",
-        "slim/psr7": "^1.5.0"
+      "firebase/php-jwt": "^5.0",
+      "slim/slim": "4.10.0",
+      "slim/psr7": "^1.5.0",
+      "logtail/monolog-logtail": "3.0.0",
+      "php": ">=8.0.0"
     }
 }
