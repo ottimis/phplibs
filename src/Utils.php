@@ -173,7 +173,7 @@ class Utils
                 }
                 $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
               } else {
-                $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'], $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end']);
+                $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'] ?? "", $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end'] ?? "");
               }
               if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
                 if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
@@ -316,7 +316,9 @@ class Utils
       while ($rec = $db->fetchassoc()) {
         if (isset($req['decode'])) {
           foreach ($req['decode'] as $value) {
-            $rec[$value] = json_decode($rec[$value], true);
+            if (isset($rec[$value]) && $rec[$value] != '') {
+              $rec[$value] = json_decode($rec[$value], true);
+            }
           }
         }
         if (isset($req['map'])) {
