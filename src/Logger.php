@@ -15,9 +15,10 @@ class Logger
   public function __construct($appName = "default")
   {
     $appName = $appName !== "default" ? $appName : getenv("LOGTAIL_APP_NAME") ?? "default";
-    if (getenv("LOGTAIL_API_KEY")) {
-      $this->Logger = new Logger($appName);
-      $this->Logger->pushHandler(new LogtailHandler(getenv("LOGTAIL_API_KEY")));
+    $apiKey = getenv("LOGTAIL_API_KEY") ?? null;
+    if ($apiKey != null) {
+      $this->Logger = new MonologLogger($appName);
+      $this->Logger->pushHandler(new LogtailHandler($apiKey));
     }
   }
 
