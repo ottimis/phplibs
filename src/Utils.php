@@ -312,7 +312,9 @@ class Utils
       if (isset($req['delete'])) {
         return array("success" => true);
       }
-      $ret = array();
+      $ret = array(
+        "data" => []
+      );
       while ($rec = $db->fetchassoc()) {
         if (isset($req['decode'])) {
           foreach ($req['decode'] as $value) {
