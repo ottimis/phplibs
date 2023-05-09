@@ -371,12 +371,15 @@ class Utils
 
   public function _combo_list($req, $where = "", $log = false)
   {
+    if (!isset($req['table'])) {
+      return false;
+    }
     $table = $req['table'];
-    $value = $req['value'];
-    $text = $req['text'];
+    $value = $req['value'] ?? "id";
+    $text = $req['text'] ?? "text";
     $other_field = isset($req['other_field']) ? ",".$req['other_field'] : "";
-    $order = $req['order'];
-    $where = $req['where'];
+    $order = $req['order'] ?? "text ASC";
+    $where = $req['where'] ?? "";
 
     if ($where != "") {
       $where = " WHERE " . $where;
