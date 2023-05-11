@@ -28,7 +28,7 @@ class Logger
    * @param  mixed $note
    * @param  mixed $code [optional]
    * 
-   * @return bool|Exception
+   * @return bool|void
    */
   public function log($note, $code = null, $data = array())
   {
@@ -46,7 +46,7 @@ class Logger
    * @param  mixed $note
    * @param  mixed $code [optional]
    * 
-   * @return bool|Exception
+   * @return void|boolean
    */
   public function warning($note, $code = null, $data = array())
   {
@@ -65,7 +65,7 @@ class Logger
    * @param  mixed $note
    * @param  mixed $code [optional]
    * 
-   * @return bool|Exception
+   * @return bool|void
    */
   public function error($note, $code = null, $data = array())
   {
@@ -76,5 +76,6 @@ class Logger
       'code' => $code,
       'stacktrace' => json_encode(debug_backtrace()),
     ], $data));
+    Notify::notify("Logger error", array("note" => $note));
   }
 }

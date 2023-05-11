@@ -30,7 +30,7 @@ class PdoConnect
       $this->conn->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
     }
     $this->debug = $error;
-    return $this->conn;
+    return;
   }
   // se error_reporting attivato riporto errore        
   /**
@@ -378,7 +378,7 @@ class PdoConnect
    * @param  mixed $table
    * @param  mixed $where
    * @param  mixed $fields
-   * @return void
+   * @return array
    */
   public function deleteRow($table, $where, $fields = ["*"])
   {
@@ -397,7 +397,7 @@ class PdoConnect
    * This function is used to increment the id of a db table by one
    *
    * @param  mixed $table
-   * @return void
+   * @return int
    */
   public function incrementId($table)
   {
@@ -486,7 +486,7 @@ class PdoConnect
 
                 print_r(dbSelect($ar));
    *
-   * @return Array
+   * @return array|boolean
    */
 
   public function dbSelect($req, $paging = array())

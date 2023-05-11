@@ -4,7 +4,7 @@ namespace ottimis\phplibs;
 
     use OAuth2\Storage\Pdo as PDO;
 
-    class PdoOA extends PDO
+    class PdoOA extends \PDO
     {
         const PROFILE_CLAIM_VALUES  = 'name';
 

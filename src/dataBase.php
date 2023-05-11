@@ -30,11 +30,11 @@ class dataBase
     $this->database = ($dbname == "" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
     $this->port = ($dbname == "" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
 
-    $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error($this->conn));
+    $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error());
     if (getenv("SQL_MODE_LEGACY") == "true") {
       $this->query("SET sql_mode = '';");
     }
-    return $this->result;
+    return;
   }
 
 
@@ -63,7 +63,7 @@ class dataBase
   /**
    * Start a db transaction  and return mysqli_begin_transaction() result
    *
-   * @return bool
+   * @return void
    */
   function startTransaction()
   {
@@ -74,7 +74,7 @@ class dataBase
   /**
    * Commits the current transaction and return mysqli_commit() result
    *
-   * @return bool
+   * @return void
    */
   function commitTransaction()
   {
@@ -84,7 +84,7 @@ class dataBase
   /**
    * Rolls back current transaction and return mysqli_rollback() result
    *
-   * @return bool
+   * @return void
    */
   function rollbackTransaction()
   {

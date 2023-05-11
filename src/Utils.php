@@ -264,7 +264,7 @@ class Utils
 
                 print_r(dbSelect($ar));
    *
-   * @return Array
+   * @return array|boolean
    */
 
   public function dbSelect($req, $paging = array())

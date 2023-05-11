@@ -96,57 +96,13 @@ use Firebase\JWT\JWT;
             return null;
         }
 
-
-
-        /**
-         * tokenCheck
-         *
-         * @param  mixed $cmd
-         *
-         * @return void
-         */
-        public function tokenCheck($cmd, $extraField = '')
-        {
-            if (array_search($cmd, $this->arWhiteList) === false) {
-                $utils = new Utils();
-                $db = new dataBase();
-
-                $jwt = $this->getBearerToken();
-
-                if ($jwt) {
-                    try {
-                        $decoded = (array) JWT::decode($jwt, $this->tokenKey, array('HS256'));
-                    } catch (Exception $e) {
-                        if ($_SERVER['REQUEST_METHOD'] !== 'OPTIONS')   {
-                            $utils->outSend(401);
-                        }
-                    }
-
-                    if (time() > $decoded['exp']) {
-                        $utils->outSend(401);
-                    } else {
-                        unset($decoded['exp']);
-                        if ($this->checkScopes($cmd, $decoded['idrole'], $extraField)) {
-                            return $decoded;
-                        } else {
-                            $utils->outSend(401);
-                        }
-                    }
-                } else {
-                    $utils->outSend(401);
-                }
-            } else {
-                return true;
-            }
-        }
-
         /**
          * tokenRefresh
          *
          * @param  mixed $idRole
          * @param  mixed $data
          *
-         * @return void
+         * @return array
          */
         public function tokenRefresh($idRole, $data = array())
         {
@@ -164,9 +120,9 @@ use Firebase\JWT\JWT;
         /**
          * tokenDecode
          *
-         * @param  String $token
+         * @param  string $token
          *
-         * @return void
+         * @return array|bool
          */
         public function tokenDecode($token)
         {
