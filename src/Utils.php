@@ -78,7 +78,7 @@ class Utils
   }
 
 
-  public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false)
+  public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false, $preventEmptyStringOnNull = true)
   {
     $db = $this->dataBase;
     $values = '';
@@ -88,6 +88,9 @@ class Utils
       if ($bInsert) {
         $columns = implode(", ", array_keys($ar));
         foreach ($ar as $k) {
+          if ($preventEmptyStringOnNull && is_null($k)) {
+            continue;
+          }
           $values .= $values != '' ? "," : "";
           if ($k !== "now()") {
             $values .= "'" . $db->real_escape_string($k) . "'";
@@ -110,6 +113,9 @@ class Utils
       } else {
         $z = "";
         foreach ($ar as $k => $v) {
+          if ($preventEmptyStringOnNull && is_null($k)) {
+            continue;
+          }
           $z .= ($z != "") ? "," : "";
           if ($v !== "now()") {
             $z .= $k . "='" . $db->real_escape_string($v) . "'";
