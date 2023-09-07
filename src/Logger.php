@@ -221,7 +221,7 @@ class Logger
 
   public static function api($app, $secure = array())
   {
-    $secureMW = function (Request $request, RequestHandler $handler) use ($secure) {
+    $secureMW = function ($request, $handler) use ($secure) {
       if (getenv("ENVIRONMENT") == "production") {
         $response = new \Slim\Psr7\Response();
         return $response
@@ -230,15 +230,15 @@ class Logger
       $response = $handler->handle($request);
       return $response;
     };
-    $app->group('/logs', function (RouteCollectorProxy $group) {
-      $group->get('', function (Request $request, Response $response) {
+    $app->group('/logs', function ($group) {
+      $group->get('', function ($request, $response) {
         $logs = self::listLogs(array("limit" => 1000));
 
         $response->getBody()->write($logs);
         return $response
           ->withHeader('Content-Type', 'text/html');
       });
-      $group->get('/{code}', function (Request $request, Response $response, $args) {
+      $group->get('/{code}', function ($request, $response, $args) {
         $where[] = array(
           "field" => "code",
           "value" => $args['code']
