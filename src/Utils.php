@@ -355,6 +355,10 @@ class Utils
           $image = imagecreatefromjpeg($imagePath);
       } elseif ($extension == 'png') {
           $image = imagecreatefrompng($imagePath);
+
+          // Imposta il colore trasparente e abilita l'alpha blending
+          imagealphablending($image, true);
+          imagesavealpha($image, true);
       } else {
           die('Formato immagine non supportato. Utilizza un file JPG o PNG.');
       }
@@ -366,8 +370,15 @@ class Utils
       // Calcola l'altezza proporzionale
       $newHeight = ($height / $width) * $newWidth;
 
-      // Crea una nuova immagine con le nuove dimensioni
+      // Crea una nuova immagine con le nuove dimensioni, considerando la trasparenza per PNG
       $newImage = imagecreatetruecolor($newWidth, $newHeight);
+
+      if ($extension == 'png') {
+          // Imposta il colore trasparente per il nuovo PNG
+          $transparent = imagecolorallocatealpha($newImage, 0, 0, 0, 127);
+          imagefill($newImage, 0, 0, $transparent);
+          imagesavealpha($newImage, true);
+      }
 
       // Ridimensiona l'immagine originale alle nuove dimensioni
       imagecopyresampled($newImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
