@@ -345,4 +345,42 @@ class Utils
     }
     return $ar;
   }
+
+  public function resizeAndSaveImage($imagePath, $newImagePath, $newWidth) {
+      // Ottieni l'estensione del file originale
+      $extension = pathinfo($imagePath, PATHINFO_EXTENSION);
+
+      // Carica l'immagine
+      if ($extension == 'jpg' || $extension == 'jpeg') {
+          $image = imagecreatefromjpeg($imagePath);
+      } elseif ($extension == 'png') {
+          $image = imagecreatefrompng($imagePath);
+      } else {
+          die('Formato immagine non supportato. Utilizza un file JPG o PNG.');
+      }
+
+      // Ottieni le dimensioni attuali dell'immagine
+      $width = imagesx($image);
+      $height = imagesy($image);
+
+      // Calcola l'altezza proporzionale
+      $newHeight = ($height / $width) * $newWidth;
+
+      // Crea una nuova immagine con le nuove dimensioni
+      $newImage = imagecreatetruecolor($newWidth, $newHeight);
+
+      // Ridimensiona l'immagine originale alle nuove dimensioni
+      imagecopyresampled($newImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+
+      // Salva l'immagine ridimensionata nel formato corretto
+      if ($extension == 'jpg' || $extension == 'jpeg') {
+          imagejpeg($newImage, $newImagePath);
+      } elseif ($extension == 'png') {
+          imagepng($newImage, $newImagePath);
+      }
+
+      // Pulisci la memoria
+      imagedestroy($image);
+      imagedestroy($newImage);
+  }
 }
