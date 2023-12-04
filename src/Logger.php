@@ -7,204 +7,215 @@ use Logtail\Monolog\LogtailHandler;
 
 class Logger
 {
-  /**
-   * @var Monolog\Logger
-   */
-  public $Logger;
+    /**
+     * @var string $appName
+     */
+    protected $serviceName;
+    /**
+     * @var string $logDriver
+     */
+    protected $logDriver = "db";
+    /**
+     * @var string $logEndpoint
+     */
+    protected $logEndpoint = "logstash.logs:8080";
 
-  public function __construct($appName = "default")
-  {
-    $appName = $appName !== "default" ? $appName : getenv("LOGTAIL_APP_NAME") ?? "default";
-    $apiKey = getenv("LOGTAIL_API_KEY") ?? null;
-    if ($apiKey != null) {
-      $this->Logger = new MonologLogger($appName);
-      $this->Logger->pushHandler(new LogtailHandler($apiKey));
-    }
-  }
-
-  /**
-   * This function log (info) text in logtail
-   *
-   * @param  mixed $note
-   * @param  mixed $code [optional]
-   * 
-   * @return bool|void
-   */
-  public function log($note, $code = null, $data = array())
-  {
-    if (!empty(getenv("LOGTAIL_API_KEY"))) {
-      $this->Logger->info($note, array_merge([
-        'code' => $code
-      ], $data));
-    } else {
-      $db = new dataBase();
-      $sql = sprintf(
-        "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', '%s')",
-        $db->real_escape_string($note),
-        $db->real_escape_string($code)
-      );
-      $ret = $db->query($sql);
-      if ($ret != false) {
-        return true;
-      } else {
-        $error = $db->error();
-        throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
-      }
-    }
-  }
-
-  /**
-   * This function log (warning) text in logtail
-   *
-   * @param  mixed $note
-   * @param  mixed $code [optional]
-   * 
-   * @return void|boolean
-   */
-  public function warning($note, $code = null, $data = array())
-  {
-    if (!empty(getenv("LOGTAIL_API_KEY"))) {
-      $this->Logger->warning($note, array_merge([
-        'code'       => $code,
-        'stacktrace' => json_encode(debug_backtrace()),
-      ], $data));
-    } else {
-      $db = new dataBase();
-      $sql = sprintf(
-        "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
-        $db->real_escape_string(json_encode(debug_backtrace())),
-        $db->real_escape_string($note),
-        $db->real_escape_string($code)
-      );
-      $ret = $db->query($sql);
-      Notify::notify("Logger warning", array("note" => $note));
-      if ($ret != false) {
-        return true;
-      } else {
-        $error = $db->error();
-        throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
-      }
-    }
-  }
-
-  /**
-   * This function log (error) text in logtail
-   *
-   * @param  mixed $note
-   * @param  mixed $code [optional]
-   * 
-   * @return bool|void
-   */
-  public function error($note, $code = null, $data = array())
-  {
-    if (!empty(getenv("LOGTAIL_API_KEY"))) {
-      $this->Logger->error($note, array_merge([
-        'code'       => $code,
-        'stacktrace' => json_encode(debug_backtrace()),
-      ], $data));
-      Notify::notify("Logger error", array("note" => $note));
-    } else {
-      $db = new dataBase();
-      $sql = sprintf(
-        "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', '%s')",
-        $db->real_escape_string(json_encode(debug_backtrace())),
-        $db->real_escape_string($note),
-        $db->real_escape_string($code)
-      );
-      $ret = $db->query($sql);
-      Notify::notify("Logger error", array("note" => $note));
-      if ($ret != false) {
-        return true;
-      } else {
-        $error = $db->error();
-        throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
-      }
-    }
-  }
-
-  /**
-   * This function reads the logs table of the db and returns a list of these
-   *
-   * @param  array $req: type, datetime, limit
-   * @param  bool $array [optional]
-   *
-   * @return string
-   */
-  public static function listLogs($req = array(), $array = false)
-  {
-    $utils = new Utils();
-
-    $arSql = array(
-      "select" => ["l.*"],
-      "from"   => "logs l",
-      "order"  => "id desc"
-    );
-
-    if (isset($req['where'])) {
-      $arSql['where'] = $req['where'];
+    public function __construct($appName = "default")
+    {
+        $this->serviceName = $appName !== "default" ? $appName : getenv("LOG_SERVICE_NAME") ?? "default";
+        $this->logDriver = getenv("LOG_DRIVER") ?? "db";
+        $this->logEndpoint = getenv("LOG_ENDPOINT") ?? "logstash.logs:8080";
     }
 
-    if (isset($req['type'])) {
-      $arSql['where'] = array(
-        array(
-          "field" => "type",
-          "value" => $req['type'],
-        )
-      );
+    /**
+     * This function log (info) text in logtail
+     *
+     * @param mixed $note
+     * @param mixed $code [optional]
+     *
+     * @return bool|void
+     */
+    public function log($note, $code = null, $data = array())
+    {
+        if ($this->logDriver == "logstash") {
+            $this->logstashSend(array_merge([
+                'level' => 'info',
+                'code' => $code,
+                'note' => $note,
+            ], $data));
+        } else {
+            $db = new dataBase();
+            $sql = sprintf(
+                "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', '%s')",
+                $db->real_escape_string($note),
+                $db->real_escape_string($code)
+            );
+            $ret = $db->query($sql);
+            if ($ret != false) {
+                return true;
+            } else {
+                $error = $db->error();
+                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+            }
+        }
     }
 
-    if (isset($req['limit'])) {
-      $arSql['limit'] = array(0, $req['limit']);
+    /**
+     * This function log (warning) text in logtail
+     *
+     * @param mixed $note
+     * @param mixed $code [optional]
+     *
+     * @return void|boolean
+     */
+    public function warning($note, $code = null, $data = array())
+    {
+        if ($this->logDriver == "logstash") {
+            $this->logstashSend(array_merge([
+                'level' => 'warning',
+                'code' => $code,
+                'note' => $note,
+                'stacktrace' => json_encode(debug_backtrace()),
+            ], $data));
+        } else {
+            $db = new dataBase();
+            $sql = sprintf(
+                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
+                $db->real_escape_string(json_encode(debug_backtrace())),
+                $db->real_escape_string($note),
+                $db->real_escape_string($code)
+            );
+            $ret = $db->query($sql);
+            Notify::notify("Logger warning", array("note" => $note));
+            if ($ret != false) {
+                return true;
+            } else {
+                $error = $db->error();
+                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+            }
+        }
     }
 
-    $arrSql = $utils->dbSelect($arSql);
+    /**
+     * This function log (error) text in logtail
+     *
+     * @param mixed $note
+     * @param mixed $code [optional]
+     *
+     * @return bool|void
+     */
+    public function error($note, $code = null, $data = array())
+    {
+        if ($this->logDriver == "logstash") {
+            $this->logstashSend(array_merge([
+                'level' => 'error',
+                'code' => $code,
+                'note' => $note,
+                'stacktrace' => json_encode(debug_backtrace()),
+            ], $data));
+            Notify::notify("Logger error", array("note" => $note));
+        } else {
+            $db = new dataBase();
+            $sql = sprintf(
+                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', '%s')",
+                $db->real_escape_string(json_encode(debug_backtrace())),
+                $db->real_escape_string($note),
+                $db->real_escape_string($code)
+            );
+            $ret = $db->query($sql);
+            Notify::notify("Logger error", array("note" => $note));
+            if ($ret != false) {
+                return true;
+            } else {
+                $error = $db->error();
+                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+            }
+        }
+    }
 
-    if (!$array) {
-      if (sizeof($arrSql['data']) == 1) {
-        $arrSql[] = $arrSql;
-      }
-      $ret = '';
-      foreach ($arrSql['data'] as $value) {
-        $ret .= self::prepareHtml($value);
-      }
-      $ret = self::prepareHeader() . $ret;
-      return $ret;
-    } else {
-      return $arrSql;
-    }
-  }
+    /**
+     * This function reads the logs table of the db and returns a list of these
+     *
+     * @param array $req : type, datetime, limit
+     * @param bool $array [optional]
+     *
+     * @return string
+     */
+    public static function listLogs($req = array(), $array = false)
+    {
+        $utils = new Utils();
 
-  /**
-   * This function prepare the html code for every single row of the logs table 
-   *
-   * @param  mixed $log
-   * 
-   * @return string
-   */
-  private static function prepareHtml($log)
-  {
-    $text = '';
-    $text .= "<b>" . date("d-m-Y - H:i:s", strtotime($log['datetime'])) . "</b>";
-    if ($log['code'] != "") {
-      $text .= " - Code: <b>" . $log['code'] . "</b>";
-    }
-    if ($log['note'] != "") {
-      $text .= "<br><code>" . $log['note'] . "</code> ";
-    }
-    if ($log['stacktrace']) {
-      $text .= "<br>Stacktrace: " . json_encode(json_decode($log['stacktrace'], true)[1]);
-    }
-    return "<p class=\"c-" . $log['type'] . "\">" . $text . "</p><hr>";
-  }
+        $arSql = array(
+            "select" => ["l.*"],
+            "from" => "logs l",
+            "order" => "id desc"
+        );
 
-  /**
-   * This function prepare the html header for every single row of the logs table 
-   *
-   * @return string
-   */
-  private static function prepareHeader()
-  {
-    $text = "<!doctype html>
+        if (isset($req['where'])) {
+            $arSql['where'] = $req['where'];
+        }
+
+        if (isset($req['type'])) {
+            $arSql['where'] = array(
+                array(
+                    "field" => "type",
+                    "value" => $req['type'],
+                )
+            );
+        }
+
+        if (isset($req['limit'])) {
+            $arSql['limit'] = array(0, $req['limit']);
+        }
+
+        $arrSql = $utils->dbSelect($arSql);
+
+        if (!$array) {
+            if (sizeof($arrSql['data']) == 1) {
+                $arrSql[] = $arrSql;
+            }
+            $ret = '';
+            foreach ($arrSql['data'] as $value) {
+                $ret .= self::prepareHtml($value);
+            }
+            $ret = self::prepareHeader() . $ret;
+            return $ret;
+        } else {
+            return $arrSql;
+        }
+    }
+
+    /**
+     * This function prepare the html code for every single row of the logs table
+     *
+     * @param mixed $log
+     *
+     * @return string
+     */
+    private static function prepareHtml($log)
+    {
+        $text = '';
+        $text .= "<b>" . date("d-m-Y - H:i:s", strtotime($log['datetime'])) . "</b>";
+        if ($log['code'] != "") {
+            $text .= " - Code: <b>" . $log['code'] . "</b>";
+        }
+        if ($log['note'] != "") {
+            $text .= "<br><code>" . $log['note'] . "</code> ";
+        }
+        if ($log['stacktrace']) {
+            $text .= "<br>Stacktrace: " . json_encode(json_decode($log['stacktrace'], true)[1]);
+        }
+        return "<p class=\"c-" . $log['type'] . "\">" . $text . "</p><hr>";
+    }
+
+    /**
+     * This function prepare the html header for every single row of the logs table
+     *
+     * @return string
+     */
+    private static function prepareHeader()
+    {
+        $text = "<!doctype html>
               <html>
               <head>
               <style>
@@ -215,40 +226,56 @@ class Logger
               </style>
               </head>
               <body>";
-    return $text;
-  }
+        return $text;
+    }
 
 
-  public static function api($app, $secure = array())
-  {
-    $secureMW = function ($request, $handler) use ($secure) {
-      if (getenv("ENVIRONMENT") == "production") {
-        $response = new \Slim\Psr7\Response();
-        return $response
-          ->withStatus(404);
-      }
-      $response = $handler->handle($request);
-      return $response;
-    };
-    $app->group('/logs', function ($group) {
-      $group->get('', function ($request, $response) {
-        $logs = self::listLogs(array("limit" => 1000));
+    public static function api($app, $secure = array())
+    {
+        $secureMW = function ($request, $handler) use ($secure) {
+            if (getenv("ENVIRONMENT") == "production") {
+                $response = new \Slim\Psr7\Response();
+                return $response
+                    ->withStatus(404);
+            }
+            $response = $handler->handle($request);
+            return $response;
+        };
+        $app->group('/logs', function ($group) {
+            $group->get('', function ($request, $response) {
+                $logs = self::listLogs(array("limit" => 1000));
 
-        $response->getBody()->write($logs);
-        return $response
-          ->withHeader('Content-Type', 'text/html');
-      });
-      $group->get('/{code}', function ($request, $response, $args) {
-        $where[] = array(
-          "field" => "code",
-          "value" => $args['code']
-        );
-        $logs = self::listLogs(array("where" => $where));
+                $response->getBody()->write($logs);
+                return $response
+                    ->withHeader('Content-Type', 'text/html');
+            });
+            $group->get('/{code}', function ($request, $response, $args) {
+                $where[] = array(
+                    "field" => "code",
+                    "value" => $args['code']
+                );
+                $logs = self::listLogs(array("where" => $where));
 
-        $response->getBody()->write($logs);
-        return $response
-          ->withHeader('Content-Type', 'text/html');
-      });
-    })->add($secureMW);
-  }
+                $response->getBody()->write($logs);
+                return $response
+                    ->withHeader('Content-Type', 'text/html');
+            });
+        })->add($secureMW);
+    }
+
+    private function logstashSend($data)  {
+        $data['hostname'] = gethostname();
+        $data['service'] = $this->serviceName;
+        $curl = curl_init($this->logEndpoint);
+        curl_setopt($curl, CURLOPT_POST, 1);
+        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 1);
+        curl_exec($curl);
+        if (curl_errno($curl)) {
+            $error_msg = curl_error($curl);
+            Notify::notify("Logstash error", array("note" => $error_msg));
+        }
+        curl_close($curl);
+    }
 }
