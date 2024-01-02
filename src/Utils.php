@@ -251,7 +251,7 @@ class Utils
       while ($rec = $db->fetchassoc()) {
         if (isset($req['decode'])) {
           foreach ($req['decode'] as $value) {
-            if (isset($rec[$value]) && $rec[$value] != '') {
+            if (!empty($rec[$value])) {
               $rec[$value] = json_decode($rec[$value], true);
             }
           }
