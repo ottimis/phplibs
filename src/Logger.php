@@ -106,6 +106,7 @@ class Logger
      */
     public function error($note, $code = null, $data = array())
     {
+        Notify::notify("Logger error", array("note" => $note));
         if ($this->logDriver == "logstash") {
             $this->logstashSend(array_merge([
                 'level' => 'error',
@@ -113,7 +114,6 @@ class Logger
                 'note' => $note,
                 'stacktrace' => json_encode(debug_backtrace()),
             ], $data));
-            Notify::notify("Logger error", array("note" => $note));
         } else {
             $db = new dataBase();
             $sql = sprintf(
@@ -123,7 +123,6 @@ class Logger
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
-            Notify::notify("Logger error", array("note" => $note));
             if ($ret != false) {
                 return true;
             } else {

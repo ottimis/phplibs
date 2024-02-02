@@ -420,6 +420,14 @@ class Utils
             $logErrorDetails,
             $logger = null
         ) use ($app, $errorMessage) {
+            if ($exception instanceof \Slim\Exception\HttpNotFoundException) {
+                $response = $app->getResponseFactory()->createResponse();
+                $response->getBody()->write(file_get_contents(__DIR__ . "/404/1.html"));
+                return $response
+                    ->withStatus(404)
+                    ->withHeader('Content-Type', 'text/html');
+            }
+
             $Logger = new Logger();
             $Logger->error($exception->getMessage() . " - " . $exception->getFile() . " - " . $exception->getLine(), "SLIM_ERROR");
 
