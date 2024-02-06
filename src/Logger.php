@@ -2,9 +2,6 @@
 
 namespace ottimis\phplibs;
 
-use Monolog\Logger as MonologLogger;
-use Logtail\Monolog\LogtailHandler;
-
 class Logger
 {
     /**
