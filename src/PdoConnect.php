@@ -451,6 +451,7 @@ class PdoConnect
       // $log->error('Eccezione db: ' . $e->getMessage(), "DBSQL");
       $ret['success'] = 0;
       $ret['err'] = $e->getMessage();
+      $ret['errCode'] = $e->getCode();
       // throw new \Exception('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
       return $ret;
     }
