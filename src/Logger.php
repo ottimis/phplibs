@@ -7,21 +7,32 @@ class Logger
     /**
      * @var string $appName
      */
-    protected $serviceName;
+    protected string $serviceName;
     /**
      * @var string $logDriver
      */
-    protected $logDriver = "db";
+    protected string $logDriver = "db";
     /**
-     * @var string $logEndpoint
+     * @var string $logStashEndpoint
      */
-    protected $logEndpoint = "logstash.logs:8080";
+    protected string $logStashEndpoint = "logstash.logs:8080";
+    protected \Aws\CloudWatchLogs\CloudWatchLogsClient $CloudWatchClient;
+    protected string $logGroupName;
+    protected string $logStreamName;
 
     public function __construct($appName = "default")
     {
         $this->serviceName = $appName !== "default" ? $appName : getenv("LOG_SERVICE_NAME") ?? "default";
         $this->logDriver = getenv("LOG_DRIVER") ?? "db";
-        $this->logEndpoint = getenv("LOG_ENDPOINT") ?? "logstash.logs:8080";
+        $this->logStashEndpoint = getenv("LOG_ENDPOINT") ?? "logstash.logs:8080";
+        if ($this->logDriver == "aws")  {
+            $this->logGroupName = "{$this->serviceName}-log-group";
+            $this->logStreamName = "{$this->serviceName}-log-stream";
+            $this->CloudWatchClient = new \Aws\CloudWatchLogs\CloudWatchLogsClient([
+                'version' => 'latest',
+                'region' => getenv("AWS_REGION") ?? 'eu-south-1',
+            ]);
+        }
     }
 
     /**
@@ -36,6 +47,12 @@ class Logger
     {
         if ($this->logDriver == "logstash") {
             $this->logstashSend(array_merge([
+                'level' => 'info',
+                'code' => $code,
+                'note' => $note,
+            ], $data));
+        } else if ($this->logDriver == "aws") {
+            $this->awsCloudWatchSend(array_merge([
                 'level' => 'info',
                 'code' => $code,
                 'note' => $note,
@@ -74,6 +91,12 @@ class Logger
                 'note' => $note,
                 'stacktrace' => json_encode(debug_backtrace()),
             ], $data));
+        } else if ($this->logDriver == "aws") {
+            $this->awsCloudWatchSend(array_merge([
+                'level' => 'warning',
+                'code' => $code,
+                'note' => $note,
+            ], $data));
         } else {
             $db = new dataBase();
             $sql = sprintf(
@@ -106,6 +129,13 @@ class Logger
         Notify::notify("Logger error", array("note" => $note));
         if ($this->logDriver == "logstash") {
             $this->logstashSend(array_merge([
+                'level' => 'error',
+                'code' => $code,
+                'note' => $note,
+                'stacktrace' => json_encode(debug_backtrace()),
+            ], $data));
+        } else if ($this->logDriver == "aws") {
+            $this->awsCloudWatchSend(array_merge([
                 'level' => 'error',
                 'code' => $code,
                 'note' => $note,
@@ -262,7 +292,7 @@ class Logger
     private function logstashSend($data)  {
         $data['hostname'] = gethostname();
         $data['service'] = $this->serviceName;
-        $curl = curl_init($this->logEndpoint);
+        $curl = curl_init($this->logStashEndpoint);
         curl_setopt($curl, CURLOPT_POST, 1);
         curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -273,5 +303,23 @@ class Logger
             Notify::notify("Logstash error", array("note" => $error_msg));
         }
         curl_close($curl);
+    }
+
+    private function awsCloudWatchSend($data) {
+        $logEvent = [
+            'logGroupName' => $this->logGroupName,
+            'logStreamName' => $this->logStreamName,
+            'logEvents' => [
+                [
+                    'timestamp' => round(microtime(true) * 1000),
+                    'message' => json_encode($data),
+                ],
+            ],
+        ];
+        try {
+            $this->CloudWatchClient->putLogEvents($logEvent);
+        } catch (\Exception $e) {
+            Notify::notify("CloudWatch error", array("note" => $e->getMessage()));
+        }
     }
 }
