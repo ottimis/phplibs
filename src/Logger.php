@@ -22,15 +22,15 @@ class Logger
 
     public function __construct($appName = "default")
     {
-        $this->serviceName = $appName !== "default" ? $appName : getenv("LOG_SERVICE_NAME") ?? "default";
-        $this->logDriver = getenv("LOG_DRIVER") ?? "db";
-        $this->logStashEndpoint = getenv("LOG_ENDPOINT") ?? "logstash.logs:8080";
+        $this->serviceName = $appName !== "default" ? $appName : (getenv("LOG_SERVICE_NAME") ?: "default");
+        $this->logDriver = getenv("LOG_DRIVER") ?: "db";
+        $this->logStashEndpoint = getenv("LOG_ENDPOINT") ?: "logstash.logs:8080";
         if ($this->logDriver == "aws")  {
             $this->logGroupName = "{$this->serviceName}-log-group";
             $this->logStreamName = "{$this->serviceName}-log-stream";
             $this->CloudWatchClient = new \Aws\CloudWatchLogs\CloudWatchLogsClient([
                 'version' => 'latest',
-                'region' => getenv("AWS_REGION") ?? 'eu-south-1',
+                'region' => getenv("AWS_REGION") ?: 'eu-south-1',
             ]);
         }
     }
