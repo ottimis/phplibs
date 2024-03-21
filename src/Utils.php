@@ -428,10 +428,21 @@ class Utils
                     ->withHeader('Content-Type', 'text/html');
             }
 
-            $Logger = new Logger();
-            $Logger->error($exception->getMessage() . " - " . $exception->getFile() . " - " . $exception->getLine(), "SLIM_ERROR");
+            $logData = [
+                "id" => uniqid(),
+                "message" => $exception->getMessage(),
+                "file" => $exception->getFile(),
+                "line" => $exception->getLine(),
+                "RequestURI" => $request->getUri()->getPath(),
+                "RequestMethod" => $request->getMethod(),
+                "RequestParams" => $request->getBody(),
+                "QueryParams" => $request->getQueryParams(),
+            ];
 
-            error_log($exception->getMessage() . " - " . $exception->getFile() . " - " . $exception->getLine(), 0);
+            $Logger = new Logger();
+            $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData);
+
+            error_log(json_encode($logData), 0);
 
             $response = $app->getResponseFactory()->createResponse();
             $response->getBody()->write($errorMessage);
