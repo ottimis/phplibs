@@ -234,7 +234,7 @@ class Utils
                 $ar['from'],
                 isset($ar['join']) ? $ar['join'] : '',
                 isset($ar['where']) ? "WHERE " . $ar['where'] : '',
-                $ar['other']
+                isset($ar['other']) ? $ar['other'] : ''
             );
         }
 
