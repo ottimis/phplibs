@@ -30,6 +30,8 @@ class Utils
         $ar = array_map(function ($value) use ($db) {
             $value = match ($value) {
                 'now()' => "now()",
+                true => 1,
+                false => 0,
                 null => "NULL",
                 default => "'" . $db->real_escape_string($value) . "'",
             };
