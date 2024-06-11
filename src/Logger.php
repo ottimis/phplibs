@@ -2,6 +2,7 @@
 
 namespace ottimis\phplibs;
 
+use Gelf\Transport\TcpTransport;
 use Gelf\Transport\UdpTransport;
 
 class Logger
@@ -23,7 +24,7 @@ class Logger
     protected string $logStreamName;
 
     // Gelf Logger
-    protected UdpTransport $UdpTransport;
+    protected UdpTransport | TcpTransport $GelfTransport;
     protected \Gelf\Publisher $GelfPublisher;
     protected \Gelf\Logger $GelfLogger;
 
@@ -40,8 +41,14 @@ class Logger
                 'region' => getenv("AWS_REGION") ?: 'eu-central-1',
             ]);
         } else if ($this->logDriver == "gelf") {
-            $this->UdpTransport = new \Gelf\Transport\UdpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"), \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN);
-            $this->GelfPublisher = new \Gelf\Publisher($this->UdpTransport);
+            $this->GelfTransport = new \Gelf\Transport\UdpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"), \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN);
+            $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
+            $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
+                'service_name' => $this->serviceName,
+            ]);
+        } else if ($this->logDriver == "gelf-tcp")  {
+            $this->GelfTransport = new \Gelf\Transport\TcpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"));
+            $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
             $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
                 'service_name' => $this->serviceName,
             ]);
@@ -70,7 +77,7 @@ class Logger
                 'code' => $code,
                 'note' => $note,
             ], $data));
-        } else if ($this->logDriver == "gelf") {
+        } else if ($this->logDriver == "gelf" || $this->logDriver == "gelf-tcp") {
             $this->GelfLogger->info($note, $data);
         } else {
             $db = new dataBase();
@@ -112,7 +119,7 @@ class Logger
                 'code' => $code,
                 'note' => $note,
             ], $data));
-        } else if ($this->logDriver == "gelf") {
+        } else if ($this->logDriver == "gelf" || $this->logDriver == "gelf-tcp") {
             $this->GelfLogger->warning($note, $data);
         } else {
             $db = new dataBase();
@@ -158,7 +165,7 @@ class Logger
                 'note' => $note,
                 'stacktrace' => json_encode(debug_backtrace()),
             ], $data));
-        } else if ($this->logDriver == "gelf") {
+        } else if ($this->logDriver == "gelf" || $this->logDriver == "gelf-tcp") {
             $this->GelfLogger->error($note, $data);
         } else {
             $db = new dataBase();
