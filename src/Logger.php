@@ -2,6 +2,8 @@
 
 namespace ottimis\phplibs;
 
+use Gelf\Transport\UdpTransport;
+
 class Logger
 {
     /**
@@ -20,6 +22,11 @@ class Logger
     protected string $logGroupName;
     protected string $logStreamName;
 
+    // Gelf Logger
+    protected UdpTransport $UdpTransport;
+    protected \Gelf\Publisher $GelfPublisher;
+    protected \Gelf\Logger $GelfLogger;
+
     public function __construct($appName = "default")
     {
         $this->serviceName = $appName !== "default" ? $appName : (getenv("LOG_SERVICE_NAME") ?: "default");
@@ -30,7 +37,13 @@ class Logger
             $this->logStreamName = "{$this->serviceName}-log-stream";
             $this->CloudWatchClient = new \Aws\CloudWatchLogs\CloudWatchLogsClient([
                 'version' => 'latest',
-                'region' => getenv("AWS_REGION") ?: 'eu-south-1',
+                'region' => getenv("AWS_REGION") ?: 'eu-central-1',
+            ]);
+        } else if ($this->logDriver == "gelf") {
+            $this->UdpTransport = new \Gelf\Transport\UdpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"), \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN);
+            $this->GelfPublisher = new \Gelf\Publisher($this->UdpTransport);
+            $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
+                'service_name' => $this->serviceName,
             ]);
         }
     }
@@ -57,6 +70,8 @@ class Logger
                 'code' => $code,
                 'note' => $note,
             ], $data));
+        } else if ($this->logDriver == "gelf") {
+            $this->GelfLogger->info($note, $data);
         } else {
             $db = new dataBase();
             $sql = sprintf(
@@ -97,6 +112,8 @@ class Logger
                 'code' => $code,
                 'note' => $note,
             ], $data));
+        } else if ($this->logDriver == "gelf") {
+            $this->GelfLogger->warning($note, $data);
         } else {
             $db = new dataBase();
             $sql = sprintf(
@@ -141,6 +158,8 @@ class Logger
                 'note' => $note,
                 'stacktrace' => json_encode(debug_backtrace()),
             ], $data));
+        } else if ($this->logDriver == "gelf") {
+            $this->GelfLogger->error($note, $data);
         } else {
             $db = new dataBase();
             $sql = sprintf(

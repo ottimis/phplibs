@@ -1,25 +1,29 @@
 {
-    "name": "ottimis/phplibs",
-    "version": "2.8.0",
-    "keywords": [
-        "release",
-        "official",
-        "stable"
-    ],
-    "description": "Php Library",
-    "autoload": {
-        "psr-4": {
-            "ottimis\\phplibs\\": "src"
-        }
-    },
-    "require": {
-      "aws/aws-sdk-php": "^3.300.5",
-      "firebase/php-jwt": "^5.0",
-      "egulias/email-validator": "^4.0.2",
-      "slim/slim": "4.10.0",
-      "slim/psr7": "^1.5.0",
-      "php": "^8.0.0",
-      "ext-gd": "*",
-      "ext-curl": "*"
+  "name": "ottimis/phplibs",
+  "version": "2.9.0",
+  "keywords": [
+    "release",
+    "official",
+    "stable"
+  ],
+  "description": "Php Library",
+  "autoload": {
+    "psr-4": {
+      "ottimis\\phplibs\\": "src"
     }
+  },
+  "require": {
+    "aws/aws-sdk-php": "^3.300.5",
+    "firebase/php-jwt": "^5.0",
+    "egulias/email-validator": "^4.0.2",
+    "slim/slim": "4.10.0",
+    "slim/psr7": "^1.5.0",
+    "php": "^8.0.0",
+    "ext-gd": "*",
+    "ext-curl": "*",
+    "graylog2/gelf-php": "^2.0"
+  },
+  "suggest": {
+    "graylog2/gelf-php": "~2.0.1"
+  }
 }
