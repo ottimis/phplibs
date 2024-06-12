@@ -15,6 +15,7 @@ class Logger
      * @var string $logDriver
      */
     protected string $logDriver = "db";
+    protected string $logTagName;
     /**
      * @var string $logStashEndpoint
      */
@@ -32,6 +33,7 @@ class Logger
     {
         $this->serviceName = $appName !== "default" ? $appName : (getenv("LOG_SERVICE_NAME") ?: "default");
         $this->logDriver = getenv("LOG_DRIVER") ?: "db";
+        $this->logTagName = getenv("LOG_TAG_NAME") ?: "service_name";
         $this->logStashEndpoint = getenv("LOG_ENDPOINT") ?: "logstash.logs:8080";
         if ($this->logDriver == "aws")  {
             $this->logGroupName = "{$this->serviceName}-log-group";
@@ -44,13 +46,13 @@ class Logger
             $this->GelfTransport = new \Gelf\Transport\UdpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"), \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN);
             $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
             $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
-                'service_name' => $this->serviceName,
+                $this->logTagName => $this->serviceName,
             ]);
         } else if ($this->logDriver == "gelf-tcp")  {
             $this->GelfTransport = new \Gelf\Transport\TcpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"));
             $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
             $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
-                'service_name' => $this->serviceName,
+                $this->logTagName => $this->serviceName,
             ]);
         }
     }
