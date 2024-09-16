@@ -127,7 +127,7 @@ use Firebase\JWT\JWT;
         public function tokenDecode($token)
         {
             try {
-                $decoded = (array) JWT::decode($token, $this->tokenKey, array('HS256'));
+                $decoded = (array) JWT::decode($token, $this->tokenKey);
             } catch (\Exception $e) {
                 return false;
             }
