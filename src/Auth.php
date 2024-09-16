@@ -110,7 +110,7 @@ use Firebase\JWT\JWT;
             $time = $this->tokenExpiration != '' ? $this->tokenExpiration : time() + (60 * 60 * 24 * 10); 
             $data['exp'] = $time;
             $data['idrole'] = $idRole;
-            $jwt = JWT::encode($data, $this->tokenKey);
+            $jwt = JWT::encode($data, $this->tokenKey, 'HS256');
             
             $ar['token'] = $jwt;
             $ar['token_date'] = 'now()';
