@@ -2,8 +2,9 @@
 
 namespace ottimis\phplibs;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
-    class Auth
+class Auth
     {
         protected $tokenKey = 'KEY_DEFAULT_Ott1m1s!&!';
         protected $funcField = '';
@@ -127,7 +128,7 @@ use Firebase\JWT\JWT;
         public function tokenDecode($token)
         {
             try {
-                $decoded = (array) JWT::decode($token, $this->tokenKey);
+                $decoded = (array) JWT::decode($token, new Key($this->tokenKey, 'HS256'));
             } catch (\Exception $e) {
                 return false;
             }
