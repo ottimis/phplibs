@@ -452,7 +452,11 @@ class Utils
             error_log(json_encode($logData), 0);
 
             $response = $app->getResponseFactory()->createResponse();
-            $response->getBody()->write($errorMessage);
+            if (empty($logData['QueryParams']['debug'])) {
+                $response->getBody()->write($errorMessage);
+            } else {
+                $response->getBody()->write($exception->getMessage());
+            }
 
             return $response;
         };
