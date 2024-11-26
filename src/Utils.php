@@ -441,8 +441,13 @@ class Utils
                 "QueryParams" => $request->getQueryParams(),
             ];
 
-            $Logger = new Logger();
-            $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData);
+            try {
+                $Logger = new Logger();
+                $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData);
+            } catch (\Exception $e) {
+                Notify::notify("Error in logging: " . $e->getMessage());
+                error_log("Error in logging: " . $e->getMessage());
+            }
 
             error_log(json_encode($logData), 0);
 
