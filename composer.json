@@ -1,6 +1,6 @@
 {
   "name": "ottimis/phplibs",
-  "version": "2.11.7",
+  "version": "2.11.8",
   "keywords": [
     "release",
     "official",
@@ -14,10 +14,10 @@
   },
   "require": {
     "aws/aws-sdk-php": "^3.330.2",
-    "firebase/php-jwt": "v6.10.1",
+    "firebase/php-jwt": "v6.10.2",
     "egulias/email-validator": "^4.0.2",
-    "slim/slim": "4.10.0",
-    "slim/psr7": "^1.5.0",
+    "slim/slim": "4.14.0",
+    "slim/psr7": "^1.7.0",
     "php": "^8.0.0",
     "ext-gd": "*",
     "ext-curl": "*",
