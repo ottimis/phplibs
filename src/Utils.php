@@ -467,4 +467,64 @@ class Utils
 
         /** FINE ERROR HANDLER */
     }
+
+    /**
+     * Generate a Swagger page with configurable parameters
+     *
+     * @param string $jsonEndpoint The endpoint where the Swagger JSON file is served
+     * @param string $title Optional title for the Swagger UI
+     * @return string HTML content for the Swagger UI
+     */
+    public static function getSwaggerPage(string $jsonEndpoint, string $title = 'API Documentation'): string
+    {
+        return <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{$title}</title>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui.css" />
+    <style>
+    html {
+        box-sizing: border-box;
+        overflow: -moz-scrollbars-vertical;
+        overflow-y: scroll;
+    }
+    
+    *,
+    *:before,
+    *:after {
+        box-sizing: inherit;
+    }
+    
+    body {
+        margin: 0;
+        background: #fafafa;
+    }
+</style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui-bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            const ui = SwaggerUIBundle({
+                url: '{$jsonEndpoint}',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: 'StandaloneLayout',
+            });
+        };
+    </script>
+</body>
+</html>
+HTML;
+    }
 }
