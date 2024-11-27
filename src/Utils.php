@@ -285,16 +285,16 @@ class Utils
 
     private function buildPaging($ar, $paging)
     {
-        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchField'])) {
+        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchFields'])) {
             $searchWhere = array();
-            foreach ($paging['searchField'] as $k => $v) {
+            foreach ($paging['searchFields'] as $k => $v) {
                 $searchWhere[] = sprintf("$v like '%%%s%%'", $paging['s']);
             }
-            $stringSearch = "(" . implode(' OR ', $searchWhere) . ")";
+            $stringSearch = implode(" OR ", $searchWhere);
             if (isset($ar['where'])) {
                 $ar['where'] .= " AND ($stringSearch)";
             } else {
-                $ar['where'] = "WHERE ($stringSearch)";
+                $ar['where'] = "($stringSearch)";
             }
         }
         if (isset($paging['srt']) && isset($paging['o'])) {
