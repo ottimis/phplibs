@@ -204,20 +204,50 @@ class Utils
      * @return array|boolean
      */
 
-    public function dbSelect($req, $paging = array())
+    public function dbSelect($req, $paging = array(), $sqlOnly = false)
     {
         $db = $this->dataBase;
-        $ar = $this->buildWhere($req);
+        // Pass req only for relevant keys: where, join, rightJoin, innerJoin, limit... Needed to prevent broken queries
+        $ar = $this->buildWhere(
+            array_intersect_key(
+                $req,
+                array_flip([
+                    'select',
+                    'from',
+                    'join',
+                    'rightJoin',
+                    'innerJoin',
+                    'where',
+                    'group',
+                    'order',
+                    'limit',
+                    'other'
+                ])
+            )
+        );
 
         if (sizeof($paging) > 0) {
-            $res = $this->buildPaging($ar, $paging);
-            $ar = $res['sql'];
+            $ar = $this->buildPaging($ar, $paging);
+        }
+
+        $ctes = [];
+        if (isset($req['cte'])) {
+            foreach ($req['cte'] as $v) {
+                $ctePaging = $v['paging'] ? $paging : [];
+                $ctePaging['noTotal'] = true;
+                $ctes[] = [
+                    "name" => $v['name'],
+                    "sql" => $this->dbSelect($v, $ctePaging, true),
+                ];
+            }
         }
 
         if (isset($req['select'])) {
             $sql = sprintf(
-                "SELECT %s %s FROM %s %s %s %s %s %s %s %s %s",
-                isset($req['count']) || sizeof($paging) > 0 ? "SQL_CALC_FOUND_ROWS " : '',
+                "%s SELECT %s FROM %s %s %s %s %s %s %s %s %s",
+                !empty($ctes) ? implode(", ", array_map(function ($v) {
+                    return "WITH " . $v['name'] . " AS (" . $v['sql'] . ")";
+                }, $ctes)) : "",
                 $ar['select'],
                 $ar['from'],
                 isset($ar['join']) ? $ar['join'] : '',
@@ -242,6 +272,10 @@ class Utils
 
         if (isset($req['log']) && $req['log']) {
             $this->Log->log("Query: " . $sql, "DBSLC1");
+        }
+
+        if ($sqlOnly) {
+            return $sql;
         }
 
         $res = $db->query($sql);
@@ -305,7 +339,10 @@ class Utils
             $start = $paging['p'] != "" ? ($paging['p'] - 1) * $count : 0;
             $ar["limit"] = "$start, $count";
         }
-        return array("sql" => $ar);
+        if (empty($paging['noTotal'])) {
+            $ar["select"] = "SQL_CALC_FOUND_ROWS " . $ar["select"];
+        }
+        return $ar;
     }
 
     public function _combo_list($req, $where = "", $log = false)
