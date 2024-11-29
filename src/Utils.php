@@ -233,7 +233,7 @@ class Utils
         $ctes = [];
         if (isset($req['cte'])) {
             foreach ($req['cte'] as $v) {
-                $ctePaging = $v['paging'] ? $paging : [];
+                $ctePaging = empty($v['paging']) ? [] : $v['paging'];
                 $ctePaging['noTotal'] = true;
                 $ctes[] = [
                     "name" => $v['name'],
