@@ -1,6 +1,6 @@
 {
   "name": "ottimis/phplibs",
-  "version": "2.14.1",
+  "version": "3.0.0",
   "keywords": [
     "release",
     "official",
@@ -18,7 +18,7 @@
     "egulias/email-validator": "^4.0.2",
     "slim/slim": "4.14.0",
     "slim/psr7": "^1.7.0",
-    "php": "^8.0.0",
+    "php": "^8.3.0",
     "ext-gd": "*",
     "ext-curl": "*",
     "graylog2/gelf-php": "^2.0"
