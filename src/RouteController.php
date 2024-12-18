@@ -86,6 +86,7 @@ class RouteController
         $controllerInstance = new $controllerClass(); // Istanza temporanea solo per il reflection
         $reflection = new ReflectionClass($controllerInstance);
 
+        $routes = [];
         foreach ($reflection->getMethods() as $method) {
             $methodName = $method->getName();
 
@@ -106,21 +107,41 @@ class RouteController
                     $routePath = $basePath;
                 }
 
-                $routes = [];
-                foreach ($httpMethods as $httpMethod) {
-                    $routes[] = $app->map([$httpMethod], $routePath, [$controllerInstance, $methodName]);
-                }
+                $routes[] = [
+                    "httpMethods" => $httpMethods,
+                    "path" => $routePath,
+                    "methodName" => $methodName,
+                    "middlewares" => $method->getAttributes(Middleware::class)
+                ];
+            }
+        }
 
-                // Applica i middleware dinamici definiti negli attributi
-                $middlewareAttributes = $method->getAttributes(Middleware::class);
-                foreach ($middlewareAttributes as $attribute) {
-                    $middlewareNames = $attribute->newInstance()->middlewares;
+        // Sort routes: first routes without path params, then routes with path params
+        // This is necessary to avoid shadowing routes with path params
+        usort($routes, function ($a, $b) {
+            $aParamCount = substr_count($a['path'], '{');
+            $bParamCount = substr_count($b['path'], '{');
+            return $aParamCount <=> $bParamCount;
+        });
 
-                    foreach ($middlewareNames as $name) {
-                        if (isset(self::$middlewareRegistry[$name])) {
-                            foreach ($routes as $route) {
-                                $route->add(self::$middlewareRegistry[$name]);
-                            }
+        foreach ($routes as $route) {
+            $routeInstances = [];
+            foreach ($route['httpMethods'] as $httpMethod) {
+                $routeInstances[] = $app->map(
+                    [$httpMethod],
+                    $route['path'],
+                    [$controllerInstance, $route['methodName']]
+                );
+            }
+
+            // Applica i middleware dinamici definiti negli attributi
+            foreach ($route['middlewares'] as $attribute) {
+                $middlewareNames = $attribute->newInstance()->middlewares;
+
+                foreach ($middlewareNames as $name) {
+                    if (isset(self::$middlewareRegistry[$name])) {
+                        foreach ($routeInstances as $routeInstance) {
+                            $routeInstance->add(self::$middlewareRegistry[$name]);
                         }
                     }
                 }

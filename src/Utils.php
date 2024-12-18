@@ -6,14 +6,8 @@ use Psr\Log\LoggerInterface;
 
 class Utils
 {
-    /**
-     * @var dataBase
-     */
-    public $dataBase;
-    /**
-     * @var Logger | @var LoggerPdo
-     */
-    public $Log;
+    public dataBase $dataBase;
+    public LoggerPdo|Logger $Log;
 
     public function __construct($dbname = "")
     {
@@ -21,21 +15,34 @@ class Utils
         $this->Log = getenv('LOG_DB_TYPE') == 'mssql' ? new LoggerPdo() : new Logger();
     }
 
+    public function startTransaction(): void
+    {
+        $this->dataBase->startTransaction();
+    }
 
-    public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false, $preventEmptyStringOnNull = true)
+    public function commitTransaction(): void
+    {
+        $this->dataBase->commitTransaction();
+    }
+
+    public function rollbackTransaction(): void
+    {
+        $this->dataBase->rollbackTransaction();
+    }
+
+    public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false, $preventEmptyStringOnNull = true): array
     {
         $db = $this->dataBase;
 
         // Filter special keys like "now()" and null
         $ar = array_map(function ($value) use ($db) {
-            $value = match ($value) {
+            return match ($value) {
                 'now()' => "now()",
                 true => 1,
                 false => 0,
                 null => "NULL",
                 default => "'" . $db->real_escape_string($value) . "'",
             };
-            return $value;
         }, $ar);
 
         // Merge $key + "=" + $value
@@ -319,10 +326,27 @@ class Utils
 
     private function buildPaging($ar, $paging)
     {
+        // Foreach filterable fields, add to where with and condition and =
+        if (!empty($paging['filterableFields']))    {
+            $filterWhere = array();
+            foreach ($paging['filterableFields'] as $v) {
+                if (isset($paging[$v])) {
+                    $filterWhere[] = sprintf("$v = '%s'", $this->dataBase->real_escape_string($paging[$v]));
+                }
+            }
+            if (!empty($filterWhere)) {
+                $stringFilter = implode(" AND ", $filterWhere);
+                if (isset($ar['where'])) {
+                    $ar['where'] .= " AND ($stringFilter)";
+                } else {
+                    $ar['where'] = "($stringFilter)";
+                }
+            }
+        }
         if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchFields'])) {
             $searchWhere = array();
             foreach ($paging['searchFields'] as $k => $v) {
-                $searchWhere[] = sprintf("$v like '%%%s%%'", $paging['s']);
+                $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
             }
             $stringSearch = implode(" OR ", $searchWhere);
             if (isset($ar['where'])) {
