@@ -32,7 +32,7 @@ class Logger
     public function __construct($appName = "default")
     {
         $this->serviceName = $appName !== "default" ? $appName : (getenv("LOG_SERVICE_NAME") ?: "default");
-        $this->logDriver = getenv("LOG_DRIVER") ?: "db";
+        $this->logDriver = getenv("LOG_DRIVER") ?: "local";
         $this->logTagName = getenv("LOG_TAG_NAME") ?: "service_name";
         $this->logStashEndpoint = getenv("LOG_ENDPOINT") ?: "logstash.logs:8080";
         if ($this->logDriver == "aws")  {
@@ -81,7 +81,7 @@ class Logger
             ], $data));
         } else if ($this->logDriver == "gelf" || $this->logDriver == "gelf-tcp") {
             $this->GelfLogger->info($note, $data);
-        } else {
+        } else if ($this->logDriver == "db") {
             $db = new dataBase();
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', '%s')",
@@ -95,6 +95,8 @@ class Logger
                 $error = $db->error();
                 throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
+        } else {
+            error_log("$note $code", 1);
         }
     }
 
@@ -123,7 +125,7 @@ class Logger
             ], $data));
         } else if ($this->logDriver == "gelf" || $this->logDriver == "gelf-tcp") {
             $this->GelfLogger->warning($note, $data);
-        } else {
+        } else if ($this->logDriver == "db") {
             $db = new dataBase();
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
@@ -139,6 +141,8 @@ class Logger
                 $error = $db->error();
                 throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
+        } else {
+            error_log("$note $code", 2);
         }
     }
 
@@ -169,7 +173,7 @@ class Logger
             ], $data));
         } else if ($this->logDriver == "gelf" || $this->logDriver == "gelf-tcp") {
             $this->GelfLogger->error($note, $data);
-        } else {
+        } else if ($this->logDriver == "db") {
             $db = new dataBase();
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', '%s')",
@@ -184,6 +188,8 @@ class Logger
                 $error = $db->error();
                 throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
+        } else {
+            error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace()), 3);
         }
     }
 

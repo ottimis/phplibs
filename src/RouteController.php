@@ -38,9 +38,11 @@ class RouteController
     protected static array $middlewareRegistry = [];
     protected Utils $Utils;
 
-    public function __construct($dbName = null)
+    public function __construct($dbName = "")
     {
-        $this->Utils = new Utils($dbName);
+        if ($dbName !== false)  {
+            $this->Utils = new Utils($dbName);
+        }
     }
 
     private function get($table, $id) {
@@ -86,6 +88,8 @@ class RouteController
         $controllerInstance = new $controllerClass(); // Istanza temporanea solo per il reflection
         $reflection = new ReflectionClass($controllerInstance);
 
+        $globalMiddlewareAttributes = $reflection->getAttributes(Middleware::class) ?? [];
+
         $routes = [];
         foreach ($reflection->getMethods() as $method) {
             $methodName = $method->getName();
@@ -107,11 +111,14 @@ class RouteController
                     $routePath = $basePath;
                 }
 
+                $middlewareNames = $method->getAttributes(Middleware::class);
+                $middlewareNames = array_merge($globalMiddlewareAttributes, $middlewareNames);
+
                 $routes[] = [
                     "httpMethods" => $httpMethods,
                     "path" => $routePath,
                     "methodName" => $methodName,
-                    "middlewares" => $method->getAttributes(Middleware::class)
+                    "middlewares" => $middlewareNames
                 ];
             }
         }

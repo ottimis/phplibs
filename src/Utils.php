@@ -519,7 +519,7 @@ class Utils
                 $response->getBody()->write($exception->getMessage());
             }
 
-            return $response;
+            return $response->withStatus(500);
         };
 
         // Add Error Handling Middleware
