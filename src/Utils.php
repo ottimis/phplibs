@@ -2,6 +2,7 @@
 
 namespace ottimis\phplibs;
 
+use ottimis\phplibs\schemas\UPSERT_MODE;
 use Psr\Log\LoggerInterface;
 
 class Utils
