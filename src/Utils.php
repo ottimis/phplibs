@@ -30,7 +30,7 @@ class Utils
         $this->dataBase->rollbackTransaction();
     }
 
-    public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false, $preventEmptyStringOnNull = true): array
+    public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false): array
     {
         $db = $this->dataBase;
 
@@ -84,6 +84,62 @@ class Utils
         }
     }
 
+    public function upsert(UPSERT_MODE $mode, string $table, array $ar, array $fieldWhere = [], $noUpdate = false): array
+    {
+        $db = $this->dataBase;
+
+        // Filter special keys like "now()" and null
+        $ar = array_map(function ($value) use ($db) {
+            return match ($value) {
+                'now()' => "now()",
+                true => 1,
+                false => 0,
+                null => "NULL",
+                default => "'" . $db->real_escape_string($value) . "'",
+            };
+        }, $ar);
+
+        // Merge $key + "=" + $value
+        $mergedAr = array();
+        foreach ($ar as $k => $v) {
+            $mergedAr[] = "$k=$v";
+        }
+        $mergedValues = implode(", ", $mergedAr);
+
+        try {
+            if ($mode == UPSERT_MODE::INSERT) {
+                $columns = implode(", ", array_keys($ar));
+                $values = implode(", ", $ar);
+                $sql = "INSERT INTO $table ($columns) VALUES ($values)";
+                if (!$noUpdate) {
+                    $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
+                }
+            } else {
+                $where = implode(" AND ", array_map(function ($v, $k) use ($db) {
+                    return "$k = '" . $db->real_escape_string($v) . "'";
+                }, $fieldWhere, array_keys($fieldWhere)));
+                $sql = sprintf("UPDATE %s SET %s WHERE %s", $table, $mergedValues, $where);
+            }
+
+            $ret['sql'] = $sql;
+            $r = $db->query($sql);
+
+            if (!$r) {
+                $this->Log->error('Errore inserimento: ' . $db->error() . " Query: " . $sql, "DBSQL");
+                $ret['success'] = 0;
+                $ret['error'] = $db->error();
+            } else {
+                $ret['affectedRows'] = $db->affectedRows();
+                $ret['id'] = $db->insert_id();
+                $ret['success'] = 1;
+            }
+            return $ret;
+        } catch (\Exception $e) {
+            $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
+            $ret['success'] = 0;
+            return $ret;
+        }
+    }
 
     private function buildWhere($req)
     {
