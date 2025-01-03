@@ -30,6 +30,9 @@ class Utils
         $this->dataBase->rollbackTransaction();
     }
 
+    /**
+     * @deprecated Use upsert instead
+     */
     public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false): array
     {
         $db = $this->dataBase;
