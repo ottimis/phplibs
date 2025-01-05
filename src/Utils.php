@@ -84,6 +84,7 @@ class Utils
         } catch (\Exception $e) {
             $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
             $ret['success'] = 0;
+            $ret['error'] = $e->getMessage();
             return $ret;
         }
     }
