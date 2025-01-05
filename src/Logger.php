@@ -142,7 +142,7 @@ class Logger
                 throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         } else {
-            error_log("$note $code", 2);
+            error_log("$note $code", 1);
         }
     }
 
@@ -189,7 +189,7 @@ class Logger
                 throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         } else {
-            error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace()), 3);
+            error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace()), 1);
         }
     }
 
