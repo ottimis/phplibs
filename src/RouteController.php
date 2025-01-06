@@ -3,27 +3,40 @@
 namespace ottimis\phplibs;
 
 use Attribute;
+use Exception;
+use ottimis\phplibs\schemas\STATUS;
+use ottimis\phplibs\schemas\UPSERT_MODE;
 use ReflectionClass;
 use ReflectionException;
 use Slim\App;
 use Slim\Psr7\Response;
 
 #[Attribute]
-class Middleware {
-    public function __construct(public array $middlewares) {}
+class Middleware
+{
+    public function __construct(public array $middlewares)
+    {
+    }
 }
 
 #[Attribute]
-class Path {
-    public function __construct(public string $path) {}
+class Path
+{
+    public function __construct(public string $path)
+    {
+    }
 }
 
 #[Attribute]
-class Method {
-    public function __construct(public string $method) {}
+class Method
+{
+    public function __construct(public string $method)
+    {
+    }
 }
 
-class Methods {
+class Methods
+{
     public const string GET = 'GET';
     public const string POST = 'POST';
     public const string PUT = 'PUT';
@@ -37,49 +50,140 @@ class RouteController
 {
     protected static array $middlewareRegistry = [];
     protected Utils $Utils;
+    protected string $tableName;
 
     public function __construct($dbName = "")
     {
-        if ($dbName !== false)  {
+        if ($dbName !== false) {
             $this->Utils = new Utils($dbName);
         }
     }
 
-    private function get($table, $id) {
+    /**
+     * @throws Exception
+     */
+    private function checkDbConsistency(): void
+    {
+        // Check if Utils is instanced
+        if (!$this->Utils->dataBase) {
+            throw new Exception("Database is not initialized");
+        }
+        if (!$this->tableName) {
+            throw new Exception("Table name not set");
+        }
+    }
+
+    protected function validateRecord(array $data, mixed $schema): array
+    {
+        // Get all variable attributes from the schema
+        $reflection = new ReflectionClass($schema);
+        $properties = $reflection->getProperties();
+
+        $record = [];
+        foreach ($properties as $property) {
+            // Check if the property has the OpenApi Property attribute
+            $attributes = $property->getAttributes(Validator::class);
+            foreach ($attributes as $attribute) {
+                $validator = $attribute->newInstance();
+                $propertyName = $property->getName();
+                // Validate property
+                $resValid = $validator->validate($data[$propertyName] ?? null);
+                if (!$resValid['success']) {
+                    throw new Exception("There is an error validating '$propertyName': " . $resValid['message']);
+                }
+                $record[$propertyName] = $data[$propertyName];
+            }
+        }
+
+        return $record;
+    }
+
+    /**
+     * @throws Exception
+     */
+    protected function get($id): array
+    {
+        $this->checkDbConsistency();
         $arSql = [
             "select" => [
                 "*"
             ],
-            "from" => $table,
+            "from" => $this->tableName,
             "where" => [
                 [
                     "field" => "id",
                     "value" => $id,
+                ],
+                [
+                    "field" => "id_status",
+                    "value" => STATUS::ACTIVE->value,
                 ]
             ]
         ];
-        $ret = $this->Utils->dbSelect($arSql);
-        return $ret['data'][0];
+
+        $res = $this->Utils->dbSelect($arSql);
+        if (sizeof($res['data']) == 0) {
+            throw new Exception("Record not found");
+        } else {
+            $res = $res['data'][0];
+            return [
+                "success" => true,
+                "data" => $res
+            ];
+        }
     }
 
-    protected function list($table, $paging = []) {
+    /**
+     * @throws Exception
+     */
+    protected function list(array $q): array
+    {
+        $this->checkDbConsistency();
         $arSql = [
             "select" => [
                 "*"
             ],
-            "from" => $table,
+            "from" => $this->tableName,
             "where" => [
                 [
                     "field" => "id_status",
-                    "value" => 1,
+                    "value" => STATUS::ACTIVE->value,
                 ]
             ]
         ];
-        $ret = $this->Utils->dbSelect($arSql, $paging);
-        return $ret['data'];
+
+        $res = $this->Utils->dbSelect($arSql, $q);
+
+        return [
+            "success" => true,
+            "data" => $res
+        ];
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function delete(string $id): array
+    {
+        $this->checkDbConsistency();
+        $ar = array(
+            "id_status" => STATUS::CANCELLED->value,
+        );
+
+        $res = $this->Utils->upsert(UPSERT_MODE::UPDATE, $this->tableName, $ar, [
+            "id" => $id
+        ]);
+        if (!$res['success']) {
+            throw new Exception($res['error']);
+        }
+
+        return [
+            "success" => true,
+        ];
     }
 
     // Metodo per mappare le rotte in modo statico per ciascun controller
+
     /**
      * @throws ReflectionException
      */
