@@ -386,6 +386,123 @@ class Utils
         }
     }
 
+    public function select($req, $paging = array(), $sqlOnly = false): object|string
+    {
+        $db = $this->dataBase;
+        // Pass req only for relevant keys: where, join, rightJoin, innerJoin, limit... Needed to prevent broken queries
+        $ar = $this->buildWhere(
+            array_intersect_key(
+                $req,
+                array_flip([
+                    'select',
+                    'from',
+                    'join',
+                    'rightJoin',
+                    'innerJoin',
+                    'where',
+                    'group',
+                    'order',
+                    'limit',
+                    'other'
+                ])
+            )
+        );
+
+        if (sizeof($paging) > 0) {
+            $ar = $this->buildPaging($ar, $paging);
+        }
+
+        $ctes = [];
+        if (isset($req['cte'])) {
+            foreach ($req['cte'] as $v) {
+                $ctePaging = empty($v['paging']) ? [] : $v['paging'];
+                $ctePaging['noTotal'] = true;
+                $ctes[] = [
+                    "name" => $v['name'],
+                    "sql" => $this->dbSelect($v, $ctePaging, true),
+                ];
+            }
+        }
+
+        if (isset($req['select'])) {
+            $sql = sprintf(
+                "%s SELECT %s FROM %s %s %s %s %s %s %s %s %s",
+                !empty($ctes) ? implode(", ", array_map(function ($v) {
+                    return "WITH " . $v['name'] . " AS (" . $v['sql'] . ")";
+                }, $ctes)) : "",
+                $ar['select'],
+                $ar['from'],
+                isset($ar['join']) ? $ar['join'] : '',
+                isset($ar['rightJoin']) ? $ar['rightJoin'] : '',
+                isset($ar['innerJoin']) ? $ar['innerJoin'] : '',
+                isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                isset($ar['group']) ? "GROUP BY " . $ar['group'] : '',
+                isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
+                isset($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
+                isset($ar['other']) ? $ar['other'] : ''
+            );
+        } elseif (isset($req['delete'])) {
+            $sql = sprintf(
+                "DELETE %s FROM %s %s %s %s",
+                gettype($req['delete']) == 'string' ? $req['delete'] : '',
+                $ar['from'],
+                isset($ar['join']) ? $ar['join'] : '',
+                isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                isset($ar['other']) ? $ar['other'] : ''
+            );
+        }
+
+        if (isset($req['log']) && $req['log']) {
+            $this->Log->log("Query: " . $sql, "DBSLC1");
+        }
+
+        if ($sqlOnly) {
+            return $sql;
+        }
+
+        $res = $db->query($sql);
+        if ($res) {
+            if (isset($req['delete'])) {
+                return (object) [
+                    "success" => true
+                ];
+            }
+            $ret = new \stdClass();
+            $ret->data = [];
+            while ($rec = $db->fetchobject()) {
+                if (isset($req['decode'])) {
+                    foreach ($req['decode'] as $value) {
+                        if (!empty($rec->$value)) {
+                            $rec->$value = json_decode($rec->$value);
+                        }
+                    }
+                }
+                if (isset($req['map'])) {
+                    $rec = $req['map']($rec);
+                }
+                if ($rec) {
+                    $ret->data[] = $rec;
+                }
+            }
+            if (isset($req['count']) || sizeof($paging) > 0) {
+                $db->query("SELECT FOUND_ROWS()");
+                $ret->total = intval($db->fetcharray()[0]);
+                $ret->count = sizeof($ret->data);
+                $ret->rows = $ret->data;
+                unset($ret->data);
+            }
+            $db->freeresult();
+            return $ret;
+        } else {
+            $this->Log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
+            $db->freeresult();
+            return (object) [
+                "success" => false,
+                "error" => $db->error()
+            ];
+        }
+    }
+
     private function buildPaging($ar, $paging)
     {
         // Foreach filterable fields, add to where with and condition and =
@@ -405,9 +522,9 @@ class Utils
                 }
             }
         }
-        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchFields'])) {
+        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchableFields'])) {
             $searchWhere = array();
-            foreach ($paging['searchFields'] as $k => $v) {
+            foreach ($paging['searchableFields'] as $k => $v) {
                 $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
             }
             $stringSearch = implode(" OR ", $searchWhere);
