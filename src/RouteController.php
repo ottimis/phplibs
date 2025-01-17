@@ -27,15 +27,16 @@ class Path
     }
 }
 
+// Repeatable attribute
 #[Attribute]
-class Method
+class Methods
 {
-    public function __construct(public string $method)
+    public function __construct(public array $methods)
     {
     }
 }
 
-class Methods
+class Method
 {
     public const string GET = 'GET';
     public const string POST = 'POST';
@@ -201,9 +202,10 @@ class RouteController
             // Verifica che il nome del metodo inizi con un underscore
             if (str_starts_with($methodName, '_') && preg_match('/^(get|post|put|delete|patch|options|head)(.*)/i', substr($methodName, 1), $matches)) {
                 $httpMethods = [strtoupper($matches[1])];
-                $methodAttributes = $method->getAttributes(Method::class);
+                $methodAttributes = $method->getAttributes(Methods::class);
                 if (!empty($methodAttributes)) {
-                    $httpMethods = array_merge($httpMethods, array_map(fn($attr) => strtoupper($attr->newInstance()->method), $methodAttributes));
+                    $httpMethods = array_merge($httpMethods, array_map(fn($attr) => strtoupper($attr), $methodAttributes[0]->newInstance()->methods));
+                    $httpMethods = array_unique($httpMethods);
                 }
 
                 // Verifica se è presente l'attributo Path per sovrascrivere il percorso predefinito
