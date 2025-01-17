@@ -492,6 +492,7 @@ class Utils
                 unset($ret->data);
             }
             $db->freeresult();
+            $ret->success = true;
             return $ret;
         } else {
             $this->Log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
