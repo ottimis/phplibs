@@ -95,11 +95,12 @@ class Utils
 
         // Filter special keys like "now()" and null
         $ar = array_map(function ($value) use ($db) {
-            return match ($value) {
-                'now()' => "now()",
-                true => 1,
-                false => 0,
-                null => "NULL",
+            return match (true) { // Usare 'true' per gestire condizioni complesse
+                $value === 'now()' => "now()",
+                $value === true => 1,
+                $value === false => 0,
+                $value === null => "NULL",
+                gettype($value) === 'array', gettype($value) === 'object' => '"'.json_encode($value).'"',
                 default => "'" . $db->real_escape_string($value) . "'",
             };
         }, $ar);
