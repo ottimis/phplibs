@@ -179,6 +179,8 @@ class Utils
                                     $inValues[] = "'" . $db->real_escape_string($vIN) . "'";
                                 }
                                 $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
+                            } elseif ($v['operator'] === 'BETWEEN')   {
+                                $ar[$key] .= sprintf("%s BETWEEN '%s' AND '%s'", $v['field'], $db->real_escape_string($v['value'][0]), $db->real_escape_string($v['value'][1]));
                             } else {
                                 $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'] ?? "", $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end'] ?? "");
                             }
