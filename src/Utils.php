@@ -245,6 +245,123 @@ class Utils
         return $ar;
     }
 
+    private function buildSql($req)
+    {
+        $db = $this->dataBase;
+        $ar = array();
+        foreach ($req as $key => $value) {
+            if (isset($req[$key])) {
+                switch ($key) {
+                    case 'select':
+                        if (gettype($value) != 'array') {
+                            throw new \Exception("Select must be an array");
+                        }
+                        if (!isset($ar[$key])) {
+                            $ar[$key] = '';
+                        }
+                        foreach ($value as $v) {
+                            if (strpos($v, '.') === false) {
+                                $ar[$key] .= "{$req['from']}.$v, ";
+                            } else {
+                                $ar[$key] .= "$v, ";
+                            }
+                        }
+                        $ar[$key] = substr($ar[$key], 0, -2);
+                        break;
+                    case 'where':
+                        if (!isset($ar[$key])) {
+                            $ar[$key] = '';
+                        }
+                        foreach ($value as $k => $v) {
+                            if (strpos($v['field'], '.') === false) {
+                                $v['field'] = "{$req['from']}.$v[field]";
+                            }
+
+                            if (isset($v['custom'])) {
+                                $ar[$key] .= $v['custom'];
+                                if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
+                                    if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                        $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
+                                    } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                        $ar[$key] .= " AND ";
+                                    }
+                                }
+                                continue;
+                            }
+                            if (!isset($v['operator'])) {
+                                $ar[$key] .= sprintf("%s='%s'", $v['field'], $db->real_escape_string($v['value']));
+                            } elseif ($v['operator'] === 'IN') {
+                                $inValues = array();
+                                foreach ($v['value'] as $kIN => $vIN) {
+                                    $inValues[] = "'" . $db->real_escape_string($vIN) . "'";
+                                }
+                                $ar[$key] .= sprintf("%s IN(%s)", $v['field'], implode(',', $inValues));
+                            } elseif ($v['operator'] === 'BETWEEN')   {
+                                $ar[$key] .= sprintf("%s BETWEEN '%s' AND '%s'", $v['field'], $db->real_escape_string($v['value'][0]), $db->real_escape_string($v['value'][1]));
+                            } else {
+                                $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'] ?? "", $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end'] ?? "");
+                            }
+                            if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
+                                if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                    $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
+                                } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
+                                    $ar[$key] .= " AND ";
+                                }
+                            }
+                        }
+                        break;
+                    case 'join':
+                    case 'leftJoin':
+                    case 'rightJoin':
+                    case 'innerJoin':
+                        if (!isset($ar[$key])) {
+                            $ar[$key] = '';
+                        }
+                        # Get join type
+                        $joinType = match ($key) {
+                            'join' => 'JOIN',
+                            'leftJoin' => 'LEFT JOIN',
+                            'rightJoin' => 'RIGHT JOIN',
+                            'innerJoin' => 'INNER JOIN',
+                        };
+                        # Build join
+                        foreach ($value as $v) {
+                            $destinationField = $v['on'][1] ?? "id";
+                            $ar[$key] .= sprintf("%s %s ON %s=%s ",
+                                $joinType,
+                                $v['table'],
+                                "{$ar['from']}.{$v['on'][0]}",
+                                "{$v['table']}.$destinationField");
+                            if (!empty($ar['select']))  {
+                                $ar['select'] .= ", ".implode(", ", array_map(function ($f) use ($v) {
+                                        return "{$v['table']}.{$f}";
+                                    }, $v['fields']));
+                            }
+                        }
+                        break;
+                    case 'limit':
+                        $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+                        break;
+
+                    default:
+                        if (gettype($value) == 'array') {
+                            if (!isset($ar[$key])) {
+                                $ar[$key] = '';
+                            }
+                            foreach ($value as $v) {
+                                $ar[$key] .= $v .= ', ';
+                            }
+                            $ar[$key] = substr($ar[$key], 0, -2);
+                        } else {
+                            $ar[$key] = $value;
+                        }
+                        break;
+                }
+            }
+        }
+        return $ar;
+    }
+
     /**
      * dbSelect
      *
@@ -393,13 +510,14 @@ class Utils
     {
         $db = $this->dataBase;
         // Pass req only for relevant keys: where, join, rightJoin, innerJoin, limit... Needed to prevent broken queries
-        $ar = $this->buildWhere(
+        $ar = $this->buildSql(
             array_intersect_key(
                 $req,
                 array_flip([
                     'select',
                     'from',
                     'join',
+                    'leftJoin',
                     'rightJoin',
                     'innerJoin',
                     'where',
@@ -412,7 +530,7 @@ class Utils
         );
 
         if (sizeof($paging) > 0) {
-            $ar = $this->buildPaging($ar, $paging);
+            $ar = $this->buildPagingV2($ar, $paging);
         }
 
         $ctes = [];
@@ -435,23 +553,23 @@ class Utils
                 }, $ctes)) : "",
                 $ar['select'],
                 $ar['from'],
-                isset($ar['join']) ? $ar['join'] : '',
-                isset($ar['rightJoin']) ? $ar['rightJoin'] : '',
-                isset($ar['innerJoin']) ? $ar['innerJoin'] : '',
-                isset($ar['where']) ? "WHERE " . $ar['where'] : '',
-                isset($ar['group']) ? "GROUP BY " . $ar['group'] : '',
-                isset($ar['order']) ? "ORDER BY " . $ar['order'] : '',
-                isset($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
-                isset($ar['other']) ? $ar['other'] : ''
+                $ar['join'] ?? '',
+                $ar['rightJoin'] ?? '',
+                $ar['innerJoin'] ?? '',
+                !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
+                !empty($ar['group']) ? "GROUP BY " . $ar['group'] : '',
+                !empty($ar['order']) ? "ORDER BY " . $ar['order'] : '',
+                !empty($ar['limit']) ? "LIMIT " . $ar['limit'] : '',
+                $ar['other'] ?? ''
             );
         } elseif (isset($req['delete'])) {
             $sql = sprintf(
                 "DELETE %s FROM %s %s %s %s",
                 gettype($req['delete']) == 'string' ? $req['delete'] : '',
                 $ar['from'],
-                isset($ar['join']) ? $ar['join'] : '',
-                isset($ar['where']) ? "WHERE " . $ar['where'] : '',
-                isset($ar['other']) ? $ar['other'] : ''
+                $ar['join'] ?? '',
+                !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
+                $ar['other'] ?? ''
             );
         }
 
@@ -539,6 +657,61 @@ class Utils
             }
         }
         if (isset($paging['srt']) && isset($paging['o'])) {
+            $ar["order"] = $paging['srt'] . " " . $paging['o'];
+        }
+        if (isset($paging['p']) && isset($paging['c'])) {
+            $count = $paging['c'] != "" ? ($paging['c']) : 20;
+            $start = $paging['p'] != "" ? ($paging['p'] - 1) * $count : 0;
+            $ar["limit"] = "$start, $count";
+        }
+        if (empty($paging['noTotal'])) {
+            $ar["select"] = "SQL_CALC_FOUND_ROWS " . $ar["select"];
+        }
+        return $ar;
+    }
+
+    private function buildPagingV2($ar, $paging)
+    {
+        // Foreach filterable fields, add to where with and condition and =
+        if (!empty($paging['filterableFields']))    {
+            $filterWhere = array();
+            foreach ($paging['filterableFields'] as $v) {
+                if (strpos($v, '.') === false) {
+                    $v = "{$ar['from']}.$v";
+                }
+
+                if (isset($paging[$v])) {
+                    $filterWhere[] = sprintf("$v = '%s'", $this->dataBase->real_escape_string($paging[$v]));
+                }
+            }
+            if (!empty($filterWhere)) {
+                $stringFilter = implode(" AND ", $filterWhere);
+                if (isset($ar['where'])) {
+                    $ar['where'] .= " AND ($stringFilter)";
+                } else {
+                    $ar['where'] = "($stringFilter)";
+                }
+            }
+        }
+        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchableFields'])) {
+            $searchWhere = array();
+            foreach ($paging['searchableFields'] as $k => $v) {
+                if (strpos($v, '.') === false) {
+                    $v = "{$ar['from']}.$v";
+                }
+                $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
+            }
+            $stringSearch = implode(" OR ", $searchWhere);
+            if (isset($ar['where'])) {
+                $ar['where'] .= " AND ($stringSearch)";
+            } else {
+                $ar['where'] = "($stringSearch)";
+            }
+        }
+        if (isset($paging['srt']) && isset($paging['o'])) {
+            if (strpos($paging['srt'], '.') === false) {
+                $paging['srt'] = "{$ar['from']}.$paging[srt]";
+            }
             $ar["order"] = $paging['srt'] . " " . $paging['o'];
         }
         if (isset($paging['p']) && isset($paging['c'])) {

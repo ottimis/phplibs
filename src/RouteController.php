@@ -10,6 +10,7 @@ use ReflectionClass;
 use ReflectionException;
 use Slim\App;
 use Slim\Psr7\Response;
+use OpenApi\Attributes as OA;
 
 #[Attribute]
 class Middleware
@@ -82,16 +83,33 @@ class RouteController
 
         $record = [];
         foreach ($properties as $property) {
-            // Check if the property has the OpenApi Property attribute
-            $attributes = $property->getAttributes(Validator::class);
-            foreach ($attributes as $attribute) {
+            $isReadOnly = false;
+
+            // Check if the property has the OpenApi Property attribute readOnly
+            $propertyAttributes = $property->getAttributes(OA\Property::class);
+            $propertyName = $property->getName();
+            foreach ($propertyAttributes as $attribute) {
+                $propertyAttribute = $attribute->newInstance();
+                if ($propertyAttribute->readOnly === true) {
+                    $isReadOnly = true;
+                    continue;
+                }
+            }
+            // Check if the property has the Validator attribute
+            $validatorAttributes = $property->getAttributes(Validator::class);
+            foreach ($validatorAttributes as $attribute) {
                 $validator = $attribute->newInstance();
-                $propertyName = $property->getName();
+                if ($validator->readOnly) {
+                    $isReadOnly = true;
+                    continue;
+                }
                 // Validate property
                 $resValid = $validator->validate($data[$propertyName] ?? null);
                 if (!$resValid['success']) {
                     throw new Exception("There is an error validating '$propertyName': " . $resValid['message']);
                 }
+            }
+            if (!$isReadOnly) {
                 $record[$propertyName] = $data[$propertyName];
             }
         }
@@ -102,14 +120,15 @@ class RouteController
     /**
      * @throws Exception
      */
-    protected function get($id): array
+    protected function get($id, $joinTables = [], $select = null): array
     {
         $this->checkDbConsistency();
         $arSql = [
-            "select" => [
-                "*"
-            ],
+            "select" => $select ?? [
+                    "*"
+                ],
             "from" => $this->tableName,
+            "join" => $joinTables,
             "where" => [
                 [
                     "field" => "id",
@@ -122,11 +141,11 @@ class RouteController
             ]
         ];
 
-        $res = $this->Utils->dbSelect($arSql);
-        if (sizeof($res['data']) == 0) {
+        $res = $this->Utils->select($arSql);
+        if (sizeof($res->data) == 0) {
             throw new Exception("Record not found");
         } else {
-            $res = $res['data'][0];
+            $res = $res->data[0];
             return [
                 "success" => true,
                 "data" => $res

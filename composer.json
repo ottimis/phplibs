@@ -1,6 +1,6 @@
 {
   "name": "ottimis/phplibs",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "keywords": [
     "release",
     "official",
@@ -21,7 +21,8 @@
     "php": "^8.3.0",
     "ext-gd": "*",
     "ext-curl": "*",
-    "graylog2/gelf-php": "^2.0"
+    "graylog2/gelf-php": "^2.0",
+    "zircote/swagger-php": "^4.11.1"
   },
   "suggest": {
     "graylog2/gelf-php": "~2.0.1"

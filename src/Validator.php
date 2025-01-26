@@ -23,6 +23,7 @@ class Validator
         public ?string           $minDate = null,
         public ?string           $maxDate = null,
         public ?string           $multipleOf = null,
+        public ?bool             $readOnly = false,
     )
     {
     }
@@ -54,7 +55,7 @@ class Validator
                 'message' => 'Value does not match the required pattern: ' . $this->pattern,
             ];
         }
-        if ($this->format === 'date' && !DateTime::createFromFormat('Y-m-d', $value)) {
+        if ($this->format === VALIDATOR_FORMAT::DATE && !DateTime::createFromFormat('Y-m-d', $value)) {
             return [
                 'success' => false,
                 'message' => 'Value is not a valid date',
