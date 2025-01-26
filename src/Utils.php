@@ -547,10 +547,11 @@ class Utils
 
         if (isset($req['select'])) {
             $sql = sprintf(
-                "%s SELECT %s FROM %s %s %s %s %s %s %s %s %s",
+                "%s SELECT %s %s FROM %s %s %s %s %s %s %s %s %s",
                 !empty($ctes) ? implode(", ", array_map(function ($v) {
                     return "WITH " . $v['name'] . " AS (" . $v['sql'] . ")";
                 }, $ctes)) : "",
+                $req['distinct'] ? 'DISTINCT' : '',
                 $ar['select'],
                 $ar['from'],
                 $ar['join'] ?? '',
