@@ -551,7 +551,7 @@ class Utils
                 !empty($ctes) ? implode(", ", array_map(function ($v) {
                     return "WITH " . $v['name'] . " AS (" . $v['sql'] . ")";
                 }, $ctes)) : "",
-                $req['distinct'] ? 'DISTINCT' : '',
+                !empty($req['distinct']) ? 'DISTINCT' : '',
                 $ar['select'],
                 $ar['from'],
                 $ar['join'] ?? '',
