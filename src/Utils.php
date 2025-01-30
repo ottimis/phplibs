@@ -263,9 +263,7 @@ class Utils
                             $ar[$key] = '';
                         }
                         foreach ($value as $v) {
-                            if ($v instanceof ComplexField) {
-                                $ar[$key] .= $v->addTablePrefix($req['from'])->__toString() . ', ';
-                            } elseif (!str_contains($v, '.')) {
+                            if (!str_contains($v, '.') && !str_contains($v, '(')) {
                                 $ar[$key] .= "{$req['from']}.$v, ";
                             } else {
                                 $ar[$key] .= "$v, ";
@@ -331,15 +329,18 @@ class Utils
                         };
                         # Build join
                         foreach ($value as $v) {
-                            $destinationField = $v['on'][1] ?? "id";
+                            $destinationField = gettype($v['on']) == 'array' && !empty($v['on'][1]) ? $v['on'][1] : "id";
+                            $fromField = gettype($v['on']) == 'array' ? $v['on'][0] : $v['on'];
+                            $table = $v['table'] . (isset($v['alias']) ? " " . $v['alias'] : "");
+                            $alias = $v['alias'] ?? $v['table'];
                             $ar[$key] .= sprintf("%s %s ON %s=%s ",
                                 $joinType,
-                                $v['table'],
-                                "{$ar['from']}.{$v['on'][0]}",
-                                "{$v['table']}.$destinationField");
+                                $table,
+                                (!str_contains($fromField, ".") && !str_contains($fromField, "(")) ? "{$ar['from']}.{$fromField}" : $fromField,
+                                "{$alias}.$destinationField");
                             if (!empty($ar['select']))  {
-                                $ar['select'] .= ", ".implode(", ", array_map(function ($f) use ($v) {
-                                        return "{$v['table']}.{$f}";
+                                $ar['select'] .= ", ".implode(", ", array_map(function ($f) use ($v, $alias) {
+                                        return "{$alias}.{$f}";
                                     }, $v['fields']));
                             }
                         }
