@@ -2,8 +2,8 @@
 
 namespace ottimis\phplibs;
 
+use ottimis\phplibs\database_functions\ComplexField;
 use ottimis\phplibs\schemas\UPSERT_MODE;
-use Psr\Log\LoggerInterface;
 
 class Utils
 {
@@ -245,7 +245,10 @@ class Utils
         return $ar;
     }
 
-    private function buildSql($req)
+    /**
+     * @throws \Exception
+     */
+    private function buildSql($req): array
     {
         $db = $this->dataBase;
         $ar = array();
@@ -260,7 +263,9 @@ class Utils
                             $ar[$key] = '';
                         }
                         foreach ($value as $v) {
-                            if (strpos($v, '.') === false) {
+                            if ($v instanceof ComplexField) {
+                                $ar[$key] .= $v->addTablePrefix($req['from'])->__toString() . ', ';
+                            } elseif (!str_contains($v, '.')) {
                                 $ar[$key] .= "{$req['from']}.$v, ";
                             } else {
                                 $ar[$key] .= "$v, ";
@@ -273,7 +278,7 @@ class Utils
                             $ar[$key] = '';
                         }
                         foreach ($value as $k => $v) {
-                            if (strpos($v['field'], '.') === false) {
+                            if (!str_contains($v['field'], '.') && !str_contains($v['field'], '(')) {
                                 $v['field'] = "{$req['from']}.$v[field]";
                             }
 
