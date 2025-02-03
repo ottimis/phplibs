@@ -512,7 +512,7 @@ class Utils
         }
     }
 
-    public function select($req, $paging = array(), $sqlOnly = false): object|string
+    public function select($req, $paging = array(), $sqlOnly = false): array|string
     {
         $db = $this->dataBase;
         // Pass req only for relevant keys: where, join, rightJoin, innerJoin, limit... Needed to prevent broken queries
@@ -591,17 +591,19 @@ class Utils
         $res = $db->query($sql);
         if ($res) {
             if (isset($req['delete'])) {
-                return (object) [
+                return [
                     "success" => true
                 ];
             }
-            $ret = new \stdClass();
-            $ret->data = [];
-            while ($rec = $db->fetchobject()) {
+
+            $ret = [
+                "data" => []
+            ];
+            while ($rec = $db->fetchassoc()) {
                 if (isset($req['decode'])) {
                     foreach ($req['decode'] as $value) {
-                        if (!empty($rec->$value)) {
-                            $rec->$value = json_decode($rec->$value);
+                        if (!empty($rec[$value])) {
+                            $rec[$value] = json_decode($rec[$value]);
                         }
                     }
                 }
@@ -609,23 +611,23 @@ class Utils
                     $rec = $req['map']($rec);
                 }
                 if ($rec) {
-                    $ret->data[] = $rec;
+                    $ret['data'][] = $rec;
                 }
             }
             if (isset($req['count']) || sizeof($paging) > 0) {
                 $db->query("SELECT FOUND_ROWS()");
-                $ret->total = intval($db->fetcharray()[0]);
-                $ret->count = sizeof($ret->data);
-                $ret->rows = $ret->data;
+                $ret['total'] = intval($db->fetcharray()[0]);
+                $ret['count'] = sizeof($ret['data']);
+                $ret['rows'] = $ret['data'];
                 unset($ret->data);
             }
             $db->freeresult();
-            $ret->success = true;
+            $ret['success'] = true;
             return $ret;
         } else {
             $this->Log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
             $db->freeresult();
-            return (object) [
+            return [
                 "success" => false,
                 "error" => $db->error()
             ];
