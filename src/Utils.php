@@ -685,12 +685,10 @@ class Utils
         if (!empty($paging['filterableFields']))    {
             $filterWhere = array();
             foreach ($paging['filterableFields'] as $v) {
-                if (strpos($v, '.') === false) {
-                    $v = "{$ar['from']}.$v";
-                }
+                $vv = !str_contains($v, '.') ? "{$ar['from']}.$v" : $v;
 
                 if (isset($paging[$v])) {
-                    $filterWhere[] = sprintf("$v = '%s'", $this->dataBase->real_escape_string($paging[$v]));
+                    $filterWhere[] = sprintf("$vv = '%s'", $this->dataBase->real_escape_string($paging[$v]));
                 }
             }
             if (!empty($filterWhere)) {
@@ -705,9 +703,7 @@ class Utils
         if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchableFields'])) {
             $searchWhere = array();
             foreach ($paging['searchableFields'] as $k => $v) {
-                if (strpos($v, '.') === false) {
-                    $v = "{$ar['from']}.$v";
-                }
+                $v = !str_contains($v, '.') ? "{$ar['from']}.$v" : $v;
                 $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
             }
             $stringSearch = implode(" OR ", $searchWhere);
@@ -718,7 +714,7 @@ class Utils
             }
         }
         if (isset($paging['srt']) && isset($paging['o'])) {
-            if (strpos($paging['srt'], '.') === false) {
+            if (!str_contains($paging['srt'], '.')) {
                 $paging['srt'] = "{$ar['from']}.$paging[srt]";
             }
             $ar["order"] = $paging['srt'] . " " . $paging['o'];
