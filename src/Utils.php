@@ -603,7 +603,7 @@ class Utils
                 if (isset($req['decode'])) {
                     foreach ($req['decode'] as $value) {
                         if (!empty($rec[$value])) {
-                            $rec[$value] = json_decode($rec[$value]);
+                            $rec[$value] = json_decode($rec[$value], true);
                         }
                     }
                 }
