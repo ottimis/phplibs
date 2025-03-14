@@ -100,7 +100,7 @@ class Utils
                 $value === true => 1,
                 $value === false => 0,
                 $value === null => "NULL",
-                gettype($value) === 'array', gettype($value) === 'object' => '"'.json_encode($value).'"',
+                gettype($value) === 'array', gettype($value) === 'object' => "'" . $db->real_escape_string(json_encode($value)) . "'",
                 default => "'" . $db->real_escape_string($value) . "'",
             };
         }, $ar);

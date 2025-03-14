@@ -322,7 +322,7 @@ class RouteController
         });
 
         // Middleware per le richieste OPTIONS (preflight)
-        $app->options('/{routes:.+}', function ($request, $response) {
+        $app->options('{routes:.+}', function ($request, $response) {
             return $response->withStatus(200);
         });
     }
