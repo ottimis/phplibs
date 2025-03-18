@@ -13,7 +13,7 @@ class Utils
     public function __construct($dbname = "")
     {
         $this->dataBase = new dataBase($dbname);
-        $this->Log = getenv('LOG_DB_TYPE') == 'mssql' ? new LoggerPdo() : new Logger();
+        $this->Log = getenv('LOG_DB_TYPE') == 'mssql' ? new LoggerPdo() : Logger::getInstance();
     }
 
     public function startTransaction(): void
@@ -864,7 +864,7 @@ class Utils
             ];
 
             try {
-                $Logger = new Logger();
+                $Logger = Logger::getInstance();
                 $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData);
             } catch (\Exception $e) {
                 Notify::notify("Error in logging: " . $e->getMessage());

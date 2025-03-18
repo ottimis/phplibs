@@ -8,6 +8,10 @@ use Gelf\Transport\UdpTransport;
 class Logger
 {
     /**
+     * @var self|null $instance L'istanza singleton della classe
+     */
+    private static ?self $instance = null;
+    /**
      * @var string $appName
      */
     protected string $serviceName;
@@ -35,7 +39,16 @@ class Logger
         $this->logDriver = getenv("LOG_DRIVER") ?: "local";
         $this->logTagName = getenv("LOG_TAG_NAME") ?: "service_name";
         $this->logStashEndpoint = getenv("LOG_ENDPOINT") ?: "logstash.logs:8080";
-        if ($this->logDriver == "aws")  {
+
+        $this->initializeDriver();
+    }
+
+    /**
+     * Initialize the driver
+     */
+    protected function initializeDriver()
+    {
+        if ($this->logDriver == "aws") {
             $this->logGroupName = "{$this->serviceName}-log-group";
             $this->logStreamName = "{$this->serviceName}-log-stream";
             $this->CloudWatchClient = new \Aws\CloudWatchLogs\CloudWatchLogsClient([
@@ -43,18 +56,51 @@ class Logger
                 'region' => getenv("AWS_REGION") ?: 'eu-central-1',
             ]);
         } else if ($this->logDriver == "gelf") {
-            $this->GelfTransport = new \Gelf\Transport\UdpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"), \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN);
+            $this->GelfTransport = new \Gelf\Transport\UdpTransport(
+                getenv("GELF_HOST"),
+                getenv("GELF_PORT"),
+                \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN
+            );
             $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
             $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
                 $this->logTagName => $this->serviceName,
             ]);
-        } else if ($this->logDriver == "gelf-tcp")  {
-            $this->GelfTransport = new \Gelf\Transport\TcpTransport(getenv("GELF_HOST"), getenv("GELF_PORT"));
+        } else if ($this->logDriver == "gelf-tcp") {
+            $this->GelfTransport = new \Gelf\Transport\TcpTransport(
+                getenv("GELF_HOST"),
+                getenv("GELF_PORT")
+            );
             $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
             $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
                 $this->logTagName => $this->serviceName,
             ]);
         }
+    }
+
+    /**
+     * Get the singleton instance of the class if it exists, otherwise create it
+     *
+     * @param string $appName Name of the application
+     * @return self
+     */
+    public static function getInstance(string $appName = "default"): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self($appName);
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * Create new instance of the class
+     *
+     * @param string $appName Name of the application
+     * @return self
+     */
+    public static function createNew($appName = "default"): self
+    {
+        return new self($appName);
     }
 
     /**
@@ -355,5 +401,18 @@ class Logger
         } catch (\Exception $e) {
             Notify::notify("CloudWatch error", array("note" => $e->getMessage()));
         }
+    }
+
+    /**
+     * Prevent the instance from being cloned
+     */
+    private function __clone() {}
+
+    /**
+     * Prevent from being unserialized
+     */
+    public function __wakeup()
+    {
+        throw new \Exception("Cannot unserialize a singleton.");
     }
 }
