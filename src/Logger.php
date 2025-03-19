@@ -2,14 +2,15 @@
 
 namespace ottimis\phplibs;
 
+use Aws\CloudWatchLogs\CloudWatchLogsClient;
+use Exception;
+use Gelf\Logger as GelfLogger;
+use Gelf\Publisher;
 use Gelf\Transport\TcpTransport;
 use Gelf\Transport\UdpTransport;
 
 class Logger
 {
-    /**
-     * @var self|null $instance L'istanza singleton della classe
-     */
     private static ?self $instance = null;
     /**
      * @var string $appName
@@ -24,14 +25,14 @@ class Logger
      * @var string $logStashEndpoint
      */
     protected string $logStashEndpoint = "logstash.logs:8080";
-    protected \Aws\CloudWatchLogs\CloudWatchLogsClient $CloudWatchClient;
+    protected CloudWatchLogsClient $CloudWatchClient;
     protected string $logGroupName;
     protected string $logStreamName;
 
     // Gelf Logger
     protected UdpTransport | TcpTransport $GelfTransport;
-    protected \Gelf\Publisher $GelfPublisher;
-    protected \Gelf\Logger $GelfLogger;
+    protected Publisher $GelfPublisher;
+    protected GelfLogger $GelfLogger;
 
     public function __construct($appName = "default")
     {
@@ -46,32 +47,32 @@ class Logger
     /**
      * Initialize the driver
      */
-    protected function initializeDriver()
+    protected function initializeDriver(): void
     {
         if ($this->logDriver == "aws") {
-            $this->logGroupName = "{$this->serviceName}-log-group";
-            $this->logStreamName = "{$this->serviceName}-log-stream";
-            $this->CloudWatchClient = new \Aws\CloudWatchLogs\CloudWatchLogsClient([
+            $this->logGroupName = "$this->serviceName-log-group";
+            $this->logStreamName = "$this->serviceName-log-stream";
+            $this->CloudWatchClient = new CloudWatchLogsClient([
                 'version' => 'latest',
                 'region' => getenv("AWS_REGION") ?: 'eu-central-1',
             ]);
         } else if ($this->logDriver == "gelf") {
-            $this->GelfTransport = new \Gelf\Transport\UdpTransport(
+            $this->GelfTransport = new UdpTransport(
                 getenv("GELF_HOST"),
                 getenv("GELF_PORT"),
-                \Gelf\Transport\UdpTransport::CHUNK_SIZE_LAN
+                UdpTransport::CHUNK_SIZE_LAN
             );
-            $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
-            $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
+            $this->GelfPublisher = new Publisher($this->GelfTransport);
+            $this->GelfLogger = new GelfLogger($this->GelfPublisher, [
                 $this->logTagName => $this->serviceName,
             ]);
         } else if ($this->logDriver == "gelf-tcp") {
-            $this->GelfTransport = new \Gelf\Transport\TcpTransport(
+            $this->GelfTransport = new TcpTransport(
                 getenv("GELF_HOST"),
                 getenv("GELF_PORT")
             );
-            $this->GelfPublisher = new \Gelf\Publisher($this->GelfTransport);
-            $this->GelfLogger = new \Gelf\Logger($this->GelfPublisher, [
+            $this->GelfPublisher = new Publisher($this->GelfTransport);
+            $this->GelfLogger = new GelfLogger($this->GelfPublisher, [
                 $this->logTagName => $this->serviceName,
             ]);
         }
@@ -98,7 +99,7 @@ class Logger
      * @param string $appName Name of the application
      * @return self
      */
-    public static function createNew($appName = "default"): self
+    public static function createNew(string $appName = "default"): self
     {
         return new self($appName);
     }
@@ -110,8 +111,9 @@ class Logger
      * @param mixed $code [optional]
      *
      * @return bool|void
+     * @throws Exception
      */
-    public function log($note, $code = null, $data = array())
+    public function log(string $note, string|null $code = null, $data = array())
     {
         if ($this->logDriver == "logstash") {
             $this->logstashSend(array_merge([
@@ -135,11 +137,11 @@ class Logger
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
-            if ($ret != false) {
+            if ($ret) {
                 return true;
             } else {
                 $error = $db->error();
-                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+                throw new Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         } else {
             error_log("$note $code");
@@ -153,8 +155,9 @@ class Logger
      * @param mixed $code [optional]
      *
      * @return void|boolean
+     * @throws Exception
      */
-    public function warning($note, $code = null, $data = array())
+    public function warning(string $note, string|null $code = null, $data = array())
     {
         if ($this->logDriver == "logstash") {
             $this->logstashSend(array_merge([
@@ -181,11 +184,11 @@ class Logger
             );
             $ret = $db->query($sql);
             Notify::notify("Logger warning", array("note" => $note));
-            if ($ret != false) {
+            if ($ret) {
                 return true;
             } else {
                 $error = $db->error();
-                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+                throw new Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         } else {
             error_log("$note $code");
@@ -199,8 +202,9 @@ class Logger
      * @param mixed $code [optional]
      *
      * @return bool|void
+     * @throws Exception
      */
-    public function error($note, $code = null, $data = array())
+    public function error(string $note, string|null $code = null, $data = array())
     {
         Notify::notify("Logger error", array("note" => $note));
         if ($this->logDriver == "logstash") {
@@ -228,11 +232,11 @@ class Logger
                 $db->real_escape_string($code)
             );
             $ret = $db->query($sql);
-            if ($ret != false) {
+            if ($ret) {
                 return true;
             } else {
                 $error = $db->error();
-                throw new \Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
+                throw new Exception("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
             }
         } else {
             error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace()));
@@ -247,7 +251,7 @@ class Logger
      *
      * @return string
      */
-    public static function listLogs($req = array(), $array = false)
+    public static function listLogs(array $req = array(), bool $array = false): string
     {
         $utils = new Utils();
 
@@ -270,7 +274,7 @@ class Logger
             );
         }
 
-        if (isset($req['limit'])) {
+        if (!empty($req['limit'])) {
             $arSql['limit'] = array(0, $req['limit']);
         }
 
@@ -284,8 +288,7 @@ class Logger
             foreach ($arrSql['data'] as $value) {
                 $ret .= self::prepareHtml($value);
             }
-            $ret = self::prepareHeader() . $ret;
-            return $ret;
+            return self::prepareHeader() . $ret;
         } else {
             return $arrSql;
         }
@@ -298,10 +301,9 @@ class Logger
      *
      * @return string
      */
-    private static function prepareHtml($log)
+    private static function prepareHtml($log): string
     {
-        $text = '';
-        $text .= "<b>" . date("d-m-Y - H:i:s", strtotime($log['datetime'])) . "</b>";
+        $text = "<b>" . date("d-m-Y - H:i:s", strtotime($log['datetime'])) . "</b>";
         if ($log['code'] != "") {
             $text .= " - Code: <b>" . $log['code'] . "</b>";
         }
@@ -319,9 +321,9 @@ class Logger
      *
      * @return string
      */
-    private static function prepareHeader()
+    private static function prepareHeader(): string
     {
-        $text = "<!doctype html>
+        return "<!doctype html>
               <html>
               <head>
               <style>
@@ -332,11 +334,10 @@ class Logger
               </style>
               </head>
               <body>";
-        return $text;
     }
 
 
-    public static function api($app, $secure = array())
+    public static function api($app, $secure = array()): void
     {
         $secureMW = function ($request, $handler) use ($secure) {
             if (getenv("ENVIRONMENT") == "production") {
@@ -344,8 +345,7 @@ class Logger
                 return $response
                     ->withStatus(404);
             }
-            $response = $handler->handle($request);
-            return $response;
+            return $handler->handle($request);
         };
         $app->group('/logs', function ($group) {
             $group->get('', function ($request, $response) {
@@ -369,7 +369,8 @@ class Logger
         })->add($secureMW);
     }
 
-    private function logstashSend($data)  {
+    private function logstashSend($data): void
+    {
         $data['hostname'] = gethostname();
         $data['service'] = $this->serviceName;
         $curl = curl_init($this->logStashEndpoint);
@@ -385,7 +386,8 @@ class Logger
         curl_close($curl);
     }
 
-    private function awsCloudWatchSend($data) {
+    private function awsCloudWatchSend($data): void
+    {
         $logEvent = [
             'logGroupName' => $this->logGroupName,
             'logStreamName' => $this->logStreamName,
@@ -398,7 +400,7 @@ class Logger
         ];
         try {
             $this->CloudWatchClient->putLogEvents($logEvent);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notify::notify("CloudWatch error", array("note" => $e->getMessage()));
         }
     }
@@ -410,9 +412,10 @@ class Logger
 
     /**
      * Prevent from being unserialized
+     * @throws Exception
      */
     public function __wakeup()
     {
-        throw new \Exception("Cannot unserialize a singleton.");
+        throw new Exception("Cannot unserialize a singleton.");
     }
 }

@@ -2,18 +2,50 @@
 
 namespace ottimis\phplibs;
 
+use Exception;
 use ottimis\phplibs\database_functions\ComplexField;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 
 class Utils
 {
+    private static ?self $instance = null;
     public dataBase $dataBase;
     public LoggerPdo|Logger $Log;
 
-    public function __construct($dbname = "")
+    public function __construct($dbName = "", $singleton = true)
     {
-        $this->dataBase = new dataBase($dbname);
+        if ($singleton) {
+            $this->dataBase = dataBase::getInstance($dbName);
+        } else {
+            $this->dataBase = dataBase::createNew($dbName);
+        }
         $this->Log = getenv('LOG_DB_TYPE') == 'mssql' ? new LoggerPdo() : Logger::getInstance();
+    }
+
+    /**
+     * Get the singleton instance of the class if it exists, otherwise create it
+     *
+     * @param string $dbName
+     * @return self
+     */
+    public static function getInstance(string $dbName = ""): self
+    {
+        if (self::$instance === null) {
+            self::$instance = new self($dbName);
+        }
+
+        return self::$instance;
+    }
+
+    /**
+     * Create new instance of the class
+     *
+     * @param string $dbName
+     * @return self
+     */
+    public static function createNew(string $dbName = ""): self
+    {
+        return new self($dbName, false);
     }
 
     public function startTransaction(): void
@@ -81,7 +113,7 @@ class Utils
                 $ret['success'] = 1;
             }
             return $ret;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
             $ret['success'] = 0;
             $ret['error'] = $e->getMessage();
@@ -140,7 +172,7 @@ class Utils
                 $ret['success'] = 1;
             }
             return $ret;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
             $ret['success'] = 0;
             $ret['error'] = $e->getMessage();
@@ -246,7 +278,7 @@ class Utils
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     private function buildSql($req): array
     {
@@ -257,7 +289,7 @@ class Utils
                 switch ($key) {
                     case 'select':
                         if (gettype($value) != 'array') {
-                            throw new \Exception("Select must be an array");
+                            throw new Exception("Select must be an array");
                         }
                         if (!isset($ar[$key])) {
                             $ar[$key] = '';
@@ -827,7 +859,7 @@ class Utils
      * @param $app
      * @param $errorMessage
      * @return void
-     * @throws \Exception
+     * @throws Exception
      * Function to handle errors in Slim
      * IMPORTANT: Remember to add $app->addRoutingMiddleware(); after $app = AppFactory::create();
      */
@@ -866,7 +898,7 @@ class Utils
             try {
                 $Logger = Logger::getInstance();
                 $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Notify::notify("Error in logging: " . $e->getMessage());
                 error_log("Error in logging: " . $e->getMessage());
             }
@@ -948,5 +980,19 @@ class Utils
 </body>
 </html>
 HTML;
+    }
+
+    /**
+     * Prevent the instance from being cloned
+     */
+    private function __clone() {}
+
+    /**
+     * Prevent from being unserialized
+     * @throws Exception
+     */
+    public function __wakeup()
+    {
+        throw new Exception("Cannot unserialize a singleton.");
     }
 }
