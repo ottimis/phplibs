@@ -3,7 +3,6 @@
 namespace ottimis\phplibs;
 
 use Exception;
-use ottimis\phplibs\database_functions\ComplexField;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 
 class Utils
