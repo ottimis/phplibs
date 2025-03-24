@@ -4,6 +4,7 @@ namespace ottimis\phplibs;
 
 use Attribute;
 use Exception;
+use ottimis\phplibs\Middlewares\ValidationMiddleware;
 use ottimis\phplibs\schemas\STATUS;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 use ReflectionClass;
@@ -48,6 +49,14 @@ class Method
     public const string HEAD = 'HEAD';
 }
 
+#[Attribute(Attribute::TARGET_METHOD)]
+class Schema
+{
+    public function __construct(public string $class)
+    {
+    }
+}
+
 class RouteController
 {
     protected static array $middlewareRegistry = [];
@@ -75,7 +84,7 @@ class RouteController
         }
     }
 
-    protected function validateRecord(array $data, mixed $schema): array
+    public function validateRecord(array $data, mixed $schema): array
     {
         // Get all variable attributes from the schema
         $reflection = new ReflectionClass($schema);
@@ -243,7 +252,7 @@ class RouteController
                     "httpMethods" => $httpMethods,
                     "path" => $routePath,
                     "methodName" => $methodName,
-                    "middlewares" => $middlewareNames
+                    "Middlewares" => $middlewareNames
                 ];
             }
         }
@@ -267,7 +276,7 @@ class RouteController
             }
 
             // Applica i middleware dinamici definiti negli attributi
-            foreach ($route['middlewares'] as $attribute) {
+            foreach ($route['Middlewares'] as $attribute) {
                 $middlewareNames = $attribute->newInstance()->middlewares;
 
                 foreach ($middlewareNames as $name) {
@@ -276,6 +285,16 @@ class RouteController
                             $routeInstance->add(self::$middlewareRegistry[$name]);
                         }
                     }
+                }
+            }
+
+            // Middleware automatico di validazione dallo schema (se presente)
+            $methodReflection = $reflection->getMethod($route['methodName']);
+            $schemaAttr = $methodReflection->getAttributes(Schema::class);
+            if (!empty($schemaAttr)) {
+                $schemaClass = $schemaAttr[0]->newInstance()->class;
+                foreach ($routeInstances as $routeInstance) {
+                    $routeInstance->add(new ValidationMiddleware($controllerInstance, $schemaClass));
                 }
             }
         }
