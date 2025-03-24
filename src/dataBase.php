@@ -15,10 +15,7 @@ class dataBase
     protected string $port = '';
     protected bool $persistent = false;
     protected mysqli|null $conn = NULL;
-    /**
-     * @var mysqli_result
-     */
-    protected mysqli_result $result;
+    protected mysqli_result|bool $result;
 
 
     public function __construct($dbname = "")
