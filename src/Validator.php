@@ -4,6 +4,7 @@ namespace ottimis\phplibs;
 
 use Attribute;
 use DateTime;
+use ottimis\phplibs\Interfaces\OGEnumValidatorInterface;
 use ottimis\phplibs\schemas\VALIDATOR_FORMAT;
 use ottimis\phplibs\schemas\VALIDATOR_TYPE;
 
@@ -18,6 +19,7 @@ class Validator
         public ?VALIDATOR_FORMAT $format = null,
         public ?VALIDATOR_TYPE   $type = null,
         public ?array            $enum = null,
+        public ?object           $enumType = null,
         public ?int              $min = null,
         public ?int              $max = null,
         public ?string           $minDate = null,
@@ -67,11 +69,26 @@ class Validator
                 'message' => 'Value is not of type ' . $this->type->value,
             ];
         }
+        if (!empty($this->enum) && !empty($this->enumType)) {
+            return [
+                'success' => false,
+                'message' => 'Cannot have both enum and enumType set',
+            ];
+        }
         if ($this->enum !== null && !in_array($value, $this->enum)) {
             return [
                 'success' => false,
                 'message' => 'Value is not one of the allowed values: ' . implode(', ', $this->enum),
             ];
+        }
+        if ($this->enumType !== null && is_subclass_of($this->enumType::class, OGEnumValidatorInterface::class)) {
+            $enumType = $this->enumType::fromName($value);
+            if ($enumType === null) {
+                return [
+                    'success' => false,
+                    'message' => 'Value is not one of the allowed values: ' . implode(', ', $this->enumType::getNames()),
+                ];
+            }
         }
         if ($this->min !== null && $value < $this->min) {
             return [
