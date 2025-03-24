@@ -10,4 +10,5 @@ enum VALIDATOR_TYPE: string
     case BOOLEAN = 'boolean';
     case ARRAY = 'array';
     case OBJECT = 'object';
+    CASE ENUM = 'enum';
 }
