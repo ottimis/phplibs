@@ -118,8 +118,8 @@ class RouteController
                     throw new Exception("There is an error validating '$propertyName': " . $resValid['message']);
                 }
             }
-            if (!$isReadOnly && !empty($data[$propertyName])) {
-                $record[$propertyName] = $data[$propertyName];
+            if (!$isReadOnly && !empty($resValid['value'])) {
+                $record[$propertyName] = $resValid['value'];
             }
         }
 

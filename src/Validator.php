@@ -32,7 +32,7 @@ class Validator
     }
 
     // Validate and return error message
-    public function validate(&$value): array
+    public function validate($value): array
     {
         if ($this->required && empty($value)) {
             return [
@@ -106,6 +106,7 @@ class Validator
         }
         return [
             'success' => true,
+            'value' => $value,
         ];
     }
 }
