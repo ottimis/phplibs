@@ -178,12 +178,6 @@ class OGMail
             if (empty(getenv("SMTP_HOST"))) {
                 throw new \Exception("SMTP_HOST is required");
             }
-            if (empty(getenv("SMTP_USER"))) {
-                throw new \Exception("SMTP_USER is required");
-            }
-            if (empty(getenv("SMTP_PASSWORD"))) {
-                throw new \Exception("SMTP_PASSWORD is required");
-            }
             return $this->sendPHPMailer();
         }
     }
@@ -195,8 +189,12 @@ class OGMail
     {
         $mail = new PHPMailer();
         $mail->Host = getenv("SMTP_HOST");
-        $mail->Username = getenv("SMTP_USER");
-        $mail->Password = getenv("SMTP_PASSWORD");
+        if (!empty(getenv("SMTP_USER")))    {
+            $mail->Username = getenv("SMTP_USER");
+        }
+        if (!empty(getenv("SMTP_PASSWORD")))    {
+            $mail->Password = getenv("SMTP_PASSWORD");
+        }
         $mail->setFrom($this->mailFrom ?? getenv("SMTP_FROM"), $this->mailFromName ?? getenv("SMTP_FROM_NAME"));
 
         $mail->SMTPSecure = getenv("SMTP_SECURE");

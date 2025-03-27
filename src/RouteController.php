@@ -293,9 +293,9 @@ class RouteController
             $schemaAttr = $methodReflection->getAttributes(Schema::class);
             if (!empty($schemaAttr)) {
                 $schemaClass = $schemaAttr[0]->newInstance()->class;
-                foreach ($routeInstances as $routeInstance) {
-                    $routeInstance->add(new ValidationMiddleware($controllerInstance, $schemaClass));
-                }
+            }
+            foreach ($routeInstances as $routeInstance) {
+                $routeInstance->add(new ValidationMiddleware($controllerInstance, $schemaClass ?? null));
             }
         }
     }

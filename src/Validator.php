@@ -40,6 +40,13 @@ class Validator
                 'message' => 'Value is required',
             ];
         }
+        if (empty($value)) {
+            return [
+                'success' => true,
+                'value' => $value,
+            ];
+        }
+
         if ($this->minLength !== null && strlen($value) < $this->minLength) {
             return [
                 'success' => false,
@@ -76,7 +83,7 @@ class Validator
                 'message' => 'Cannot have both enum and enumType set',
             ];
         }
-        if ($this->enum !== null && !in_array($value, $this->enum)) {
+        if ($this->enum !== null && !in_array($value, $this->enum, true)) {
             return [
                 'success' => false,
                 'message' => 'Value is not one of the allowed values: ' . implode(', ', $this->enum),
