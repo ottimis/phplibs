@@ -2,20 +2,21 @@
 
 namespace ottimis\phplibs;
 
+use Aws\Credentials\CredentialProvider;
 use Aws\SesV2\SesV2Client;
 use Egulias\EmailValidator\EmailValidator;
 use Egulias\EmailValidator\Validation\DNSCheckValidation;
 use Egulias\EmailValidator\Validation\RFCValidation;
+use Exception;
 use ottimis\phplibs\schemas\Base\OGResponse;
 use ottimis\phplibs\schemas\OGMail\Attach;
 use ottimis\phplibs\schemas\OGMail\CID;
-use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\PHPMailer;
+use RuntimeException;
 use Smarty\Exception as SmartyException;
 
 class OGMail
 {
-    protected OGSmarty $OGSmarty;
     protected Logger $Logger;
     private SesV2Client $SESClient;
     private string $mailFrom;
@@ -24,7 +25,7 @@ class OGMail
     private string $mailText;
     private string $mailHtml;
     private array $rcpt = [];
-    private array $replyTo = [];
+    private string $replyTo;
     private array $cc = [];
     private array $bcc = [];
     private array $cids = [];
@@ -33,10 +34,15 @@ class OGMail
     public function __construct()
     {
         $this->Logger = Logger::getInstance();
-        if (getenv("SMTP_TYPE") == "aws")   {
-            $this->SESClient = new SesV2Client([
+        if (getenv("SMTP_TYPE") === "aws")   {
+            $config = [
                 'version' => 'latest',
-            ]);
+            ];
+            if (getenv('ENV') === 'local')   {
+                $provider = CredentialProvider::sso(getenv("S3_PROFILE_NAME"));
+                $config['credentials'] = $provider;
+            }
+            $this->SESClient = new SesV2Client($config);
         }
     }
 
@@ -46,9 +52,9 @@ class OGMail
         $res = $validator->isValid($email, new RFCValidation());
         if (!$dns) {
             return $res;
-        } else {
-            return $res && $validator->isValid($email, new DNSCheckValidation());
         }
+
+        return $res && $validator->isValid($email, new DNSCheckValidation());
     }
 
     public function addRcpt($email): static
@@ -57,9 +63,9 @@ class OGMail
         return $this;
     }
 
-    public function addReplyTo($email): static
+    public function setReplyTo($email): static
     {
-        $this->replyTo[] = $email;
+        $this->replyTo = $email;
         return $this;
     }
 
@@ -131,7 +137,7 @@ class OGMail
 
     /**
      * @throws SmartyException
-     * @throws \Exception
+     * @throws Exception
      */
     public function sendTemplate(
         ?string $template = null,
@@ -139,7 +145,8 @@ class OGMail
         array  $templateData = [],
     ): OGResponse
     {
-        $mailHtml = $this->OGSmarty->loadTemplate(
+        $OGSmarty = new OGSmarty();
+        $mailHtml = $OGSmarty->loadTemplate(
             $template,
             $templateString,
             $templateData
@@ -149,41 +156,41 @@ class OGMail
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     public function send(): OGResponse
     {
         if (empty($this->mailFrom) && empty(getenv("SMTP_FROM"))) {
-            throw new \Exception("Mail from is required");
+            throw new RuntimeException("Mail from is required");
         }
         if (empty($this->mailFromName) && empty(getenv("SMTP_FROM_NAME"))) {
-            throw new \Exception("Mail from name is required");
+            throw new RuntimeException("Mail from name is required");
         }
         if (empty($this->mailSubject))  {
-            throw new \Exception("Mail subject is required");
+            throw new RuntimeException("Mail subject is required");
         }
         if (empty($this->mailHtml)) {
-            throw new \Exception("Mail html is required");
+            throw new RuntimeException("Mail html is required");
         }
         if (empty($this->rcpt)) {
-            throw new \Exception("Mail recipient is required");
+            throw new RuntimeException("Mail recipient is required");
         }
         if (empty($this->mailText)) {
             $this->mailText = strip_tags($this->mailHtml);
         }
 
-        if (getenv("SMTP_TYPE") == "aws") {
+        if (getenv("SMTP_TYPE") === "aws") {
             return $this->sendAWS();
-        } else {
-            if (empty(getenv("SMTP_HOST"))) {
-                throw new \Exception("SMTP_HOST is required");
-            }
-            return $this->sendPHPMailer();
         }
+
+        if (empty(getenv("SMTP_HOST"))) {
+            throw new RuntimeException("SMTP_HOST is required");
+        }
+        return $this->sendPHPMailer();
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     public function sendPHPMailer(): OGResponse
     {
@@ -240,7 +247,7 @@ class OGMail
                     success: true
                 );
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->Logger->error("Errore mail - " . $e->getMessage());
             return new OGResponse(
                 success: false,
@@ -256,13 +263,13 @@ class OGMail
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
     public function sendAWS(): OGResponse
     {
         // New lines are required for the MIME boundary!!! Do not remove them!
-        $boundary = uniqid(rand(), true);
-        $alternativeBoundary = 'ALT-' . uniqid(rand(), true);
+        $boundary = uniqid(mt_rand(), true);
+        $alternativeBoundary = 'ALT-' . uniqid(mt_rand(), true);
         $mime_headers = [
             'MIME-Version: 1.0',
             'Content-Type: multipart/related; boundary="' . $boundary . '"',
@@ -317,7 +324,7 @@ class OGMail
             'Destination' => [
                 'ToAddresses' => [],
             ],
-            'FromEmailAddress' => "$this->mailFromName <".$this->mailFrom ?? getenv("SMTP_FROM").">",
+            'FromEmailAddress' => ($this->mailFromName ?? getenv("SMTP_FROM_NAME"))." <".($this->mailFrom ?? getenv("SMTP_FROM")).">",
             'ReplyToAddresses' => [],
         ];
         $data['Destination']['ToAddresses'] = $this->rcpt;
@@ -334,7 +341,7 @@ class OGMail
         try {
             // Send mail using AWS SES V2 SESClient
             $result = $this->SESClient->sendEmail($data);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->Logger->error("Errore mail SES -> " . $e->getMessage());
             return new OGResponse(
                 success: false,
@@ -346,12 +353,12 @@ class OGMail
             return new OGResponse(
                 success: true
             );
-        } else {
-            $this->Logger->error("Errore mail - " . json_encode($result));
-            return new OGResponse(
-                success: false,
-                errorMessage: json_encode($result)
-            );
         }
+
+        $this->Logger->error("Errore mail - " . json_encode($result, JSON_THROW_ON_ERROR));
+        return new OGResponse(
+            success: false,
+            errorMessage: json_encode($result, JSON_THROW_ON_ERROR)
+        );
     }
 }
