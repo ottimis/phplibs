@@ -3,6 +3,7 @@
 namespace ottimis\phplibs;
 
 use Exception;
+use JsonException;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 
 class Utils
@@ -125,13 +126,15 @@ class Utils
         $db = $this->dataBase;
 
         // Filter special keys like "now()" and null
-        $ar = array_map(function ($value) use ($db) {
+        $ar = array_map(/**
+         * @throws JsonException
+         */ static function ($value) use ($db) {
             return match (true) { // Usare 'true' per gestire condizioni complesse
                 $value === 'now()' => "now()",
                 $value === true => 1,
                 $value === false => 0,
                 $value === null => "NULL",
-                gettype($value) === 'array', gettype($value) === 'object' => "'" . $db->real_escape_string(json_encode($value)) . "'",
+                is_array($value), is_object($value) => "'" . $db->real_escape_string(json_encode($value, JSON_THROW_ON_ERROR)) . "'",
                 default => "'" . $db->real_escape_string($value) . "'",
             };
         }, $ar);
@@ -144,7 +147,7 @@ class Utils
         $mergedValues = implode(", ", $mergedAr);
 
         try {
-            if ($mode == UPSERT_MODE::INSERT) {
+            if ($mode === UPSERT_MODE::INSERT) {
                 $columns = implode(", ", array_keys($ar));
                 $values = implode(", ", $ar);
                 $sql = "INSERT INTO $table ($columns) VALUES ($values)";
@@ -152,7 +155,7 @@ class Utils
                     $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
                 }
             } else {
-                $where = implode(" AND ", array_map(function ($v, $k) use ($db) {
+                $where = implode(" AND ", array_map(static function ($v, $k) use ($db) {
                     return "$k = '" . $db->real_escape_string($v) . "'";
                 }, $fieldWhere, array_keys($fieldWhere)));
                 $sql = sprintf("UPDATE %s SET %s WHERE %s", $table, $mergedValues, $where);
@@ -543,6 +546,10 @@ class Utils
         }
     }
 
+    /**
+     * @throws JsonException
+     * @throws Exception
+     */
     public function select($req, $paging = array(), $sqlOnly = false): array|string
     {
         $db = $this->dataBase;
@@ -603,7 +610,7 @@ class Utils
         } elseif (isset($req['delete'])) {
             $sql = sprintf(
                 "DELETE %s FROM %s %s %s %s",
-                gettype($req['delete']) == 'string' ? $req['delete'] : '',
+                is_string($req['delete']) ? $req['delete'] : '',
                 $ar['from'],
                 $ar['join'] ?? '',
                 !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
@@ -630,11 +637,17 @@ class Utils
             $ret = [
                 "data" => []
             ];
+            // First take all records
+            $records = [];
             while ($rec = $db->fetchassoc()) {
+                $records[] = $rec;
+            }
+            // Then process them. -> This allows us to have nested queries
+            foreach ($records as $rec)    {
                 if (isset($req['decode'])) {
                     foreach ($req['decode'] as $value) {
                         if (!empty($rec[$value])) {
-                            $rec[$value] = json_decode($rec[$value], true);
+                            $rec[$value] = json_decode($rec[$value], true, 512, JSON_THROW_ON_ERROR);
                         }
                     }
                 }
@@ -645,24 +658,24 @@ class Utils
                     $ret['data'][] = $rec;
                 }
             }
-            if (isset($req['count']) || sizeof($paging) > 0) {
+            if (isset($req['count']) || count($paging) > 0) {
                 $db->query("SELECT FOUND_ROWS()");
-                $ret['total'] = intval($db->fetcharray()[0]);
-                $ret['count'] = sizeof($ret['data']);
+                $ret['total'] = (int)$db->fetcharray()[0];
+                $ret['count'] = count($ret['data']);
                 $ret['rows'] = $ret['data'];
                 unset($ret->data);
             }
             $db->freeresult();
             $ret['success'] = true;
             return $ret;
-        } else {
-            $this->Log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
-            $db->freeresult();
-            return [
-                "success" => false,
-                "error" => $db->error()
-            ];
         }
+
+        $this->Log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
+        $db->freeresult();
+        return [
+            "success" => false,
+            "error" => $db->error()
+        ];
     }
 
     private function buildPaging($ar, $paging)
@@ -684,9 +697,9 @@ class Utils
                 }
             }
         }
-        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchableFields'])) {
+        if (isset($paging['s'], $paging['searchableFields']) && strlen($paging['s']) > 1) {
             $searchWhere = array();
-            foreach ($paging['searchableFields'] as $k => $v) {
+            foreach ($paging['searchableFields'] as $v) {
                 $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
             }
             $stringSearch = implode(" OR ", $searchWhere);
@@ -696,12 +709,12 @@ class Utils
                 $ar['where'] = "($stringSearch)";
             }
         }
-        if (isset($paging['srt']) && isset($paging['o'])) {
+        if (isset($paging['srt'], $paging['o'])) {
             $ar["order"] = $paging['srt'] . " " . $paging['o'];
         }
-        if (isset($paging['p']) && isset($paging['c'])) {
-            $count = $paging['c'] != "" ? ($paging['c']) : 20;
-            $start = $paging['p'] != "" ? ($paging['p'] - 1) * $count : 0;
+        if (isset($paging['p'], $paging['c'])) {
+            $count = $paging['c'] !== "" ? ($paging['c']) : 20;
+            $start = $paging['p'] !== "" ? ($paging['p'] - 1) * $count : 0;
             $ar["limit"] = "$start, $count";
         }
         if (empty($paging['noTotal'])) {
@@ -731,7 +744,7 @@ class Utils
                 }
             }
         }
-        if (isset($paging['s']) && strlen($paging['s']) > 1 && isset($paging['searchableFields'])) {
+        if (isset($paging['s'], $paging['searchableFields']) && strlen($paging['s']) > 1) {
             $searchWhere = array();
             foreach ($paging['searchableFields'] as $k => $v) {
                 $v = !str_contains($v, '.') ? "{$ar['from']}.$v" : $v;
@@ -744,15 +757,15 @@ class Utils
                 $ar['where'] = "($stringSearch)";
             }
         }
-        if (isset($paging['srt']) && isset($paging['o'])) {
+        if (isset($paging['srt'], $paging['o'])) {
             if (!str_contains($paging['srt'], '.')) {
                 $paging['srt'] = "{$ar['from']}.$paging[srt]";
             }
             $ar["order"] = $paging['srt'] . " " . $paging['o'];
         }
-        if (isset($paging['p']) && isset($paging['c'])) {
-            $count = $paging['c'] != "" ? ($paging['c']) : 20;
-            $start = $paging['p'] != "" ? ($paging['p'] - 1) * $count : 0;
+        if (isset($paging['p'], $paging['c'])) {
+            $count = $paging['c'] !== "" ? ($paging['c']) : 20;
+            $start = $paging['p'] !== "" ? ($paging['p'] - 1) * $count : 0;
             $ar["limit"] = "$start, $count";
         }
         if (empty($paging['noTotal'])) {
@@ -856,13 +869,13 @@ class Utils
 
     /**
      * @param $app
-     * @param $errorMessage
+     * @param string $errorMessage
      * @return void
      * @throws Exception
      * Function to handle errors in Slim
      * IMPORTANT: Remember to add $app->addRoutingMiddleware(); after $app = AppFactory::create();
      */
-    public static function slimErrorHandler($app, $errorMessage = "Si è verificato un errore.")
+    public static function slimErrorHandler($app, string $errorMessage = "Si è verificato un errore."): void
     {
         /*** ERROR HANDLER */
 
@@ -884,7 +897,7 @@ class Utils
             }
 
             $logData = [
-                "id" => uniqid(),
+                "id" => uniqid('', false),
                 "message" => $exception->getMessage(),
                 "file" => $exception->getFile(),
                 "line" => $exception->getLine(),
@@ -902,7 +915,7 @@ class Utils
                 error_log("Error in logging: " . $e->getMessage());
             }
 
-            error_log(json_encode($logData), 0);
+            error_log(json_encode($logData, JSON_THROW_ON_ERROR), 0);
 
             $response = $app->getResponseFactory()->createResponse();
             if (empty($logData['QueryParams']['debug'])) {
