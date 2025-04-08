@@ -663,7 +663,7 @@ class Utils
                 $ret['total'] = (int)$db->fetcharray()[0];
                 $ret['count'] = count($ret['data']);
                 $ret['rows'] = $ret['data'];
-                unset($ret->data);
+                unset($ret['data']);
             }
             $db->freeresult();
             $ret['success'] = true;
