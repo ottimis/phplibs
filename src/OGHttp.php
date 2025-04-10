@@ -40,7 +40,7 @@ class OGHttp
         }
         if ($this->jwt) {
             curl_setopt($curl, CURLOPT_HTTPHEADER, array(
-                "Authorization: Bearer {$this->jwt}"
+                "Authorization: Bearer $this->jwt"
             ));
         }
 
@@ -65,7 +65,7 @@ class OGHttp
             'Content-Type: application/json'
         ];
         if ($this->jwt) {
-            $headers[] = "Authorization: Bearer {$this->jwt}";
+            $headers[] = "Authorization: Bearer $this->jwt";
         }
 
         curl_setopt_array($curl, [

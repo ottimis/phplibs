@@ -123,14 +123,14 @@ $utils = new Utils();
 
 // Advanced SELECT query with joins and filters
 $result = $utils->select([
-    "select" => ["u.id", "u.username", "p.name AS profile_name"],
+    "select" => ["id", "username"],
     "from" => "users u",
     "join" => [
         [
-            "fields" => ["p.name AS profile_name"]
+            "fields" => ["name AS profile_name"]
             "table" => "profiles",
-            "alias" => "p",
-            "on" => ["id_profile"]
+            "on" => ["id_profile"] // Simplified join u.id_profile = profiles.id
+            "on" => ["id_profile" => "id", "id_status" => 1] // Complex join with multiple conditions
         ]
     ],
     "where" => [
@@ -332,9 +332,8 @@ if ($result->success) {
 
 // Send an email using a Smarty template
 $mail->sendTemplate(
-    "welcome.tpl",
-    null,
-    [
+    template: "welcome.tpl",
+    data: [
         "username" => "John Doe",
         "activation_link" => "https://example.com/activate/123456"
     ]
@@ -373,20 +372,18 @@ $smarty = new OGSmarty("/path/to/smarty");
 
 // Render a template with data
 $html = $smarty->loadTemplate(
-    "email/welcome.tpl",
-    null,
-    [
+    template: "email/welcome.tpl",
+    data: [
         "username" => "John Doe",
         "year" => date("Y")
     ]
 );
 
 // Render a string as a template
-$templateString = "Hello {$username}, welcome to {$year}!";
+$templateString = "<h1>Hello {$username}, welcome to {$year}!</h1>";
 $html = $smarty->loadTemplate(
-    null,
-    $templateString,
-    [
+    templateString: $templateString,
+    data: [
         "username" => "John Doe",
         "year" => date("Y")
     ]

@@ -9,7 +9,7 @@ class OGSmarty
 {
     protected Smarty $smarty;
 
-    function __construct($smartyFolder = "/var/www/html/smarty")
+    public function __construct($smartyFolder = "/var/www/html/smarty")
     {
         $this->smarty = new Smarty();
         $this->smarty->setTemplateDir($smartyFolder . '/templates/');
@@ -28,7 +28,9 @@ class OGSmarty
         }
         if ($templateName) {
             return $this->smarty->fetch($templateName);
-        } else if ($templateString) {
+        }
+
+        if ($templateString) {
             return $this->smarty->fetch('string:' . $templateString);
         }
         return false;

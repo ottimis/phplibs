@@ -4,10 +4,11 @@ namespace ottimis\phplibs;
 
 use mysqli;
 use mysqli_result;
+use RuntimeException;
 
 class dataBase
 {
-    private static ?self $instance = null;
+    private static ?self $instances = null;
     protected string $host = '';
     protected string $user = '';
     protected string $password = '';
@@ -20,14 +21,14 @@ class dataBase
 
     public function __construct($dbname = "")
     {
-        $this->host = ($dbname == "" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
-        $this->user = ($dbname == "" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
-        $this->password = ($dbname == "" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));
-        $this->database = ($dbname == "" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
-        $this->port = ($dbname == "" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
+        $this->host = ($dbname === "" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
+        $this->user = ($dbname === "" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
+        $this->password = ($dbname === "" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));
+        $this->database = ($dbname === "" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
+        $this->port = ($dbname === "" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
 
         $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error());
-        if (getenv("SQL_MODE_LEGACY") == "true") {
+        if (getenv("SQL_MODE_LEGACY") === "true") {
             $this->query("SET sql_mode = '';");
         }
     }
@@ -64,7 +65,7 @@ class dataBase
      *
      * @return bool
      */
-    function close(): bool
+    public function close(): bool
     {
         return (mysqli_close($this->conn));
     }
@@ -76,7 +77,7 @@ class dataBase
      *
      * @return string
      */
-    function error(): string
+    public function error(): string
     {
         return (mysqli_error($this->conn));
     }
@@ -86,7 +87,7 @@ class dataBase
      *
      * @return void
      */
-    function startTransaction(): void
+    public function startTransaction(): void
     {
         mysqli_begin_transaction($this->conn);
     }
@@ -97,7 +98,7 @@ class dataBase
      *
      * @return void
      */
-    function commitTransaction(): void
+    public function commitTransaction(): void
     {
         mysqli_commit($this->conn);
     }
@@ -107,7 +108,7 @@ class dataBase
      *
      * @return void
      */
-    function rollbackTransaction(): void
+    public function rollbackTransaction(): void
     {
         mysqli_rollback($this->conn);
     }
@@ -121,7 +122,7 @@ class dataBase
      *
      * @return object|bool
      */
-    function query(string $sql): mysqli_result|bool
+    public function query(string $sql): mysqli_result|bool
     {
         $this->result = mysqli_query($this->conn, $sql);
         return $this->result;
@@ -136,7 +137,7 @@ class dataBase
      *
      * @return object|bool
      */
-    function multi_query(string $sql): mysqli_result|bool
+    public function multi_query(string $sql): mysqli_result|bool
     {
         return mysqli_multi_query($this->conn, $sql);
     }
@@ -147,7 +148,7 @@ class dataBase
      *
      * @return string|int
      */
-    function affectedRows(): int|string
+    public function affectedRows(): int|string
     {
         return (mysqli_affected_rows($this->conn));
     }
@@ -158,7 +159,7 @@ class dataBase
      *
      * @return string|int
      */
-    function numrows(): int|string
+    public function numrows(): int|string
     {
         return (mysqli_num_rows($this->result));
     }
@@ -169,7 +170,7 @@ class dataBase
      *
      * @return object|null|false
      */
-    function fetchobject(): object|false|null
+    public function fetchobject(): object|false|null
     {
         return mysqli_fetch_object($this->result);
     }
@@ -180,7 +181,7 @@ class dataBase
      *
      * @return array|null|false
      */
-    function fetcharray(): false|array|null
+    public function fetcharray(): false|array|null
     {
         return mysqli_fetch_array($this->result);
     }
@@ -191,7 +192,7 @@ class dataBase
      *
      * @return string[]|null|false
      */
-    function fetchassoc(): array|false|null
+    public function fetchassoc(): array|false|null
     {
         return mysqli_fetch_assoc($this->result);
     }
@@ -201,7 +202,7 @@ class dataBase
      *
      * @return void
      */
-    function freeresult(): void
+    public function freeresult(): void
     {
         if (!empty($this->result)) {
             $this->result->free();
@@ -217,9 +218,9 @@ class dataBase
      *
      * @return string
      */
-    function real_escape_string($param): string
+    public function real_escape_string(string $param): string
     {
-        return mysqli_real_escape_string($this->conn, $param ?? '');
+        return mysqli_real_escape_string($this->conn, $param);
     }
 
     /**
@@ -228,7 +229,7 @@ class dataBase
      *
      * @return int|string
      */
-    function insert_id(): int|string
+    public function insert_id(): int|string
     {
         return mysqli_insert_id($this->conn);
     }
@@ -240,10 +241,10 @@ class dataBase
 
     /**
      * Prevent from being unserialized
-     * @throws \Exception
+     * @throws RuntimeException
      */
     public function __wakeup()
     {
-        throw new \Exception("Cannot unserialize a singleton.");
+        throw new RuntimeException("Cannot unserialize a singleton.");
     }
 }

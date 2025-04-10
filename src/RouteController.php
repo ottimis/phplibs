@@ -9,6 +9,7 @@ use ottimis\phplibs\schemas\STATUS;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 use ReflectionClass;
 use ReflectionException;
+use RuntimeException;
 use Slim\App;
 use Slim\Psr7\Response;
 use OpenApi\Attributes as OA;
@@ -77,13 +78,16 @@ class RouteController
     {
         // Check if Utils is instanced
         if (!$this->Utils->dataBase) {
-            throw new Exception("Database is not initialized");
+            throw new RuntimeException("Database is not initialized");
         }
         if (!$this->tableName) {
-            throw new Exception("Table name not set");
+            throw new RuntimeException("Table name not set");
         }
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function validateRecord(array $data, mixed $schema): array
     {
         // Get all variable attributes from the schema
@@ -115,7 +119,7 @@ class RouteController
                 // Validate property
                 $resValid = $validator->validate($data[$propertyName] ?? null);
                 if (!$resValid['success']) {
-                    throw new Exception("There is an error validating '$propertyName': " . $resValid['message']);
+                    throw new RuntimeException("There is an error validating '$propertyName': " . $resValid['message']);
                 }
             }
             if (!$isReadOnly && !empty($resValid['value'])) {
@@ -151,15 +155,15 @@ class RouteController
         ];
 
         $res = $this->Utils->select($arSql);
-        if (sizeof($res->data) == 0) {
-            throw new Exception("Record not found");
-        } else {
-            $res = $res->data[0];
-            return [
-                "success" => true,
-                "data" => $res
-            ];
+        if (count($res['data']) === 0) {
+            throw new RuntimeException("Record not found");
         }
+
+        $res = $res['data'][0];
+        return [
+            "success" => true,
+            "data" => $res
+        ];
     }
 
     /**
@@ -203,7 +207,7 @@ class RouteController
             "id" => $id
         ]);
         if (!$res['success']) {
-            throw new Exception($res['error']);
+            throw new RuntimeException($res['error']);
         }
 
         return [
@@ -259,7 +263,7 @@ class RouteController
 
         // Sort routes: first routes without path params, then routes with path params
         // This is necessary to avoid shadowing routes with path params
-        usort($routes, function ($a, $b) {
+        usort($routes, static function ($a, $b) {
             $aParamCount = substr_count($a['path'], '{');
             $bParamCount = substr_count($b['path'], '{');
             return $aParamCount <=> $bParamCount;
@@ -317,7 +321,7 @@ class RouteController
             $uri = $request->getUri();
             $path = $uri->getPath();
 
-            if ($path != '/' && str_ends_with($path, '/')) {
+            if ($path !== '/' && str_ends_with($path, '/')) {
                 // recursively remove slashes when its more than 1 slash
                 while (str_ends_with($path, '/')) {
                     $path = substr($path, 0, -1);
@@ -325,14 +329,14 @@ class RouteController
                 // permanently redirect paths with a trailing slash
                 // to their non-trailing counterpart
                 $uri = $uri->withPath($path);
-                if ($request->getMethod() == 'GET') {
+                if ($request->getMethod() === 'GET') {
                     $response = new Response();
                     return $response
                         ->withHeader('Location', (string)$uri)
                         ->withStatus(301);
-                } else {
-                    $request = $request->withUri($uri);
                 }
+
+                $request = $request->withUri($uri);
             } else {
                 $request = $request->withUri($uri->withPath($path));
             }

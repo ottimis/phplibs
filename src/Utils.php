@@ -5,6 +5,7 @@ namespace ottimis\phplibs;
 use Exception;
 use JsonException;
 use ottimis\phplibs\schemas\UPSERT_MODE;
+use RuntimeException;
 
 class Utils
 {
@@ -19,7 +20,7 @@ class Utils
         } else {
             $this->dataBase = dataBase::createNew($dbName);
         }
-        $this->Log = getenv('LOG_DB_TYPE') == 'mssql' ? new LoggerPdo() : Logger::getInstance();
+        $this->Log = getenv('LOG_DB_TYPE') === 'mssql' ? new LoggerPdo() : Logger::getInstance();
     }
 
     /**
@@ -182,12 +183,12 @@ class Utils
         }
     }
 
-    private function buildWhere($req)
+    private function buildWhere($req): array
     {
         $db = $this->dataBase;
         $ar = array();
         foreach ($req as $key => $value) {
-            if (isset($req[$key])) {
+            if (isset($value)) {
                 switch ($key) {
                     case 'where':
                         foreach ($value as $k => $v) {
@@ -197,7 +198,7 @@ class Utils
                             if (isset($v['custom'])) {
                                 $ar[$key] .= $v['custom'];
                                 if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
-                                    if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                    if (isset($value[$k + 1], $v['operatorAfter'])) {
                                         $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
                                     } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
                                         $ar[$key] .= " AND ";
@@ -219,7 +220,7 @@ class Utils
                                 $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'] ?? "", $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end'] ?? "");
                             }
                             if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
-                                if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                if (isset($value[$k + 1], $v['operatorAfter'])) {
                                     $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
                                 } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
                                     $ar[$key] .= " AND ";
@@ -259,7 +260,7 @@ class Utils
                         break;
 
                     default:
-                        if (gettype($value) == 'array') {
+                        if (is_array($value)) {
                             if (!isset($ar[$key])) {
                                 $ar[$key] = '';
                             }
@@ -287,11 +288,11 @@ class Utils
         $db = $this->dataBase;
         $ar = array();
         foreach ($req as $key => $value) {
-            if (isset($req[$key])) {
+            if (isset($value)) {
                 switch ($key) {
                     case 'select':
-                        if (gettype($value) != 'array') {
-                            throw new Exception("Select must be an array");
+                        if (!is_array($value)) {
+                            throw new RuntimeException("Select must be an array");
                         }
                         if (!isset($ar[$key])) {
                             $ar[$key] = '';
@@ -317,7 +318,7 @@ class Utils
                             if (isset($v['custom'])) {
                                 $ar[$key] .= $v['custom'];
                                 if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
-                                    if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                    if (isset($value[$k + 1], $v['operatorAfter'])) {
                                         $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
                                     } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
                                         $ar[$key] .= " AND ";
@@ -339,7 +340,7 @@ class Utils
                                 $ar[$key] .= sprintf("%s %s %s '%s' %s", $v['before'] ?? "", $v['field'], $v['operator'], $db->real_escape_string($v['value']), $v['end'] ?? "");
                             }
                             if (isset($v['operatorAfter']) || isset($value[$k + 1])) {
-                                if (isset($value[$k + 1]) && isset($v['operatorAfter'])) {
+                                if (isset($value[$k + 1], $v['operatorAfter'])) {
                                     $ar[$key] .= sprintf(" %s ", $v['operatorAfter']);
                                 } else if (isset($value[$k + 1]) && !isset($v['operatorAfter'])) {
                                     $ar[$key] .= " AND ";
@@ -363,8 +364,8 @@ class Utils
                         };
                         # Build join
                         foreach ($value as $v) {
-                            $destinationField = gettype($v['on']) == 'array' && !empty($v['on'][1]) ? $v['on'][1] : "id";
-                            $fromField = gettype($v['on']) == 'array' ? $v['on'][0] : $v['on'];
+                            $destinationField = is_array($v['on']) && !empty($v['on'][1]) ? $v['on'][1] : "id";
+                            $fromField = is_array($v['on']) ? $v['on'][0] : $v['on'];
                             $table = $v['table'] . (isset($v['alias']) ? " " . $v['alias'] : "");
                             $alias = $v['alias'] ?? $v['table'];
                             $ar[$key] .= sprintf("%s %s ON %s=%s ",
@@ -373,7 +374,7 @@ class Utils
                                 (!str_contains($fromField, ".") && !str_contains($fromField, "(")) ? "{$ar['from']}.{$fromField}" : $fromField,
                                 "{$alias}.$destinationField");
                             if (!empty($ar['select']))  {
-                                $ar['select'] .= ", ".implode(", ", array_map(function ($f) use ($v, $alias) {
+                                $ar['select'] .= ", ".implode(", ", array_map(static function ($f) use ($v, $alias) {
                                         return "{$alias}.{$f}";
                                     }, $v['fields']));
                             }
@@ -384,7 +385,7 @@ class Utils
                         break;
 
                     default:
-                        if (gettype($value) == 'array') {
+                        if (is_array($value)) {
                             if (!isset($ar[$key])) {
                                 $ar[$key] = '';
                             }
@@ -589,10 +590,11 @@ class Utils
             }
         }
 
+        $sql = "";
         if (isset($req['select'])) {
             $sql = sprintf(
                 "%s SELECT %s %s FROM %s %s %s %s %s %s %s %s %s",
-                !empty($ctes) ? implode(", ", array_map(function ($v) {
+                !empty($ctes) ? implode(", ", array_map(static function ($v) {
                     return "WITH " . $v['name'] . " AS (" . $v['sql'] . ")";
                 }, $ctes)) : "",
                 !empty($req['distinct']) ? 'DISTINCT' : '',
@@ -774,7 +776,7 @@ class Utils
         return $ar;
     }
 
-    public function _combo_list($req, $where = "", $log = false)
+    public function _combo_list($req, $where = "", $log = false): false|array
     {
         if (!isset($req['table'])) {
             return false;
@@ -786,7 +788,7 @@ class Utils
         $order = $req['order'] ?? "text ASC";
         $where = $req['where'] ?? "";
 
-        if ($where != "") {
+        if ($where !== "") {
             $where = " WHERE " . $where;
         }
 
@@ -816,15 +818,15 @@ class Utils
         return $ar;
     }
 
-    public function resizeAndSaveImage($imagePath, $newImagePath, $newWidth)
+    public function resizeAndSaveImage($imagePath, $newImagePath, $newWidth): void
     {
         // Ottieni l'estensione del file originale
         $extension = pathinfo($imagePath, PATHINFO_EXTENSION);
 
         // Carica l'immagine
-        if ($extension == 'jpg' || $extension == 'jpeg') {
+        if ($extension === 'jpg' || $extension === 'jpeg') {
             $image = imagecreatefromjpeg($imagePath);
-        } elseif ($extension == 'png') {
+        } elseif ($extension === 'png') {
             $image = imagecreatefrompng($imagePath);
 
             // Imposta il colore trasparente e abilita l'alpha blending
@@ -844,7 +846,7 @@ class Utils
         // Crea una nuova immagine con le nuove dimensioni, considerando la trasparenza per PNG
         $newImage = imagecreatetruecolor($newWidth, $newHeight);
 
-        if ($extension == 'png') {
+        if ($extension === 'png') {
             // Imposta il colore trasparente per il nuovo PNG
             $transparent = imagecolorallocatealpha($newImage, 0, 0, 0, 127);
             imagefill($newImage, 0, 0, $transparent);
@@ -855,9 +857,9 @@ class Utils
         imagecopyresampled($newImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
 
         // Salva l'immagine ridimensionata nel formato corretto
-        if ($extension == 'jpg' || $extension == 'jpeg') {
+        if ($extension === 'jpg' || $extension === 'jpeg') {
             imagejpeg($newImage, $newImagePath);
-        } elseif ($extension == 'png') {
+        } elseif ($extension === 'png') {
             imagepng($newImage, $newImagePath);
         }
 
@@ -945,7 +947,7 @@ class Utils
     {
         return <<<HTML
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
     <title>{$title}</title>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.18.2/swagger-ui.css" />
@@ -1005,6 +1007,6 @@ HTML;
      */
     public function __wakeup()
     {
-        throw new Exception("Cannot unserialize a singleton.");
+        throw new RuntimeException("Cannot unserialize a singleton.");
     }
 }
