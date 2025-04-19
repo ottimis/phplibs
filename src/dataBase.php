@@ -19,13 +19,13 @@ class dataBase
     protected mysqli_result|bool $result;
 
 
-    public function __construct($dbname = "")
+    public function __construct($dbname = "default")
     {
-        $this->host = ($dbname === "" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
-        $this->user = ($dbname === "" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
-        $this->password = ($dbname === "" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));
-        $this->database = ($dbname === "" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
-        $this->port = ($dbname === "" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
+        $this->host = ($dbname === "default" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
+        $this->user = ($dbname === "default" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
+        $this->password = ($dbname === "default" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));
+        $this->database = ($dbname === "default" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
+        $this->port = ($dbname === "default" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
 
         $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error());
         if (getenv("SQL_MODE_LEGACY") === "true") {
@@ -39,7 +39,7 @@ class dataBase
      * @param string $dbname
      * @return self
      */
-    public static function getInstance(string $dbname = ""): self
+    public static function getInstance(string $dbname = "default"): self
     {
         if (self::$instances[$dbname] === null) {
             self::$instances[$dbname] = new self($dbname);
@@ -54,7 +54,7 @@ class dataBase
      * @param string $dbname
      * @return self
      */
-    public static function createNew(string $dbname = ""): self
+    public static function createNew(string $dbname = "default"): self
     {
         return new self($dbname);
     }

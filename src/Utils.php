@@ -9,11 +9,11 @@ use RuntimeException;
 
 class Utils
 {
-    private static ?self $instance = null;
+    private static array $instances = [];
     public dataBase $dataBase;
     public LoggerPdo|Logger $Log;
 
-    public function __construct($dbName = "", $singleton = true)
+    public function __construct($dbName = "default", $singleton = true)
     {
         if ($singleton) {
             $this->dataBase = dataBase::getInstance($dbName);
@@ -29,13 +29,13 @@ class Utils
      * @param string $dbName
      * @return self
      */
-    public static function getInstance(string $dbName = ""): self
+    public static function getInstance(string $dbName = "default"): self
     {
-        if (self::$instance === null) {
-            self::$instance = new self($dbName);
+        if (self::$instances[$dbName] === null) {
+            self::$instances[$dbName] = new self($dbName);
         }
 
-        return self::$instance;
+        return self::$instances[$dbName];
     }
 
     /**
@@ -44,7 +44,7 @@ class Utils
      * @param string $dbName
      * @return self
      */
-    public static function createNew(string $dbName = ""): self
+    public static function createNew(string $dbName = "default"): self
     {
         return new self($dbName, false);
     }
