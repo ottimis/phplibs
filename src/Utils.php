@@ -31,7 +31,7 @@ class Utils
      */
     public static function getInstance(string $dbName = "default"): self
     {
-        if (self::$instances[$dbName] === null) {
+        if (empty(self::$instances[$dbName])) {
             self::$instances[$dbName] = new self($dbName);
         }
 

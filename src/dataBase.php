@@ -41,7 +41,7 @@ class dataBase
      */
     public static function getInstance(string $dbname = "default"): self
     {
-        if (self::$instances[$dbname] === null) {
+        if (empty(self::$instances[$dbname])) {
             self::$instances[$dbname] = new self($dbname);
         }
 

@@ -64,7 +64,7 @@ class RouteController
     protected Utils $Utils;
     protected string $tableName;
 
-    public function __construct($dbName = "")
+    public function __construct($dbName = "default")
     {
         if ($dbName !== false) {
             $this->Utils = new Utils($dbName);
