@@ -8,7 +8,7 @@ use RuntimeException;
 
 class dataBase
 {
-    private static ?self $instances = null;
+    private static array $instances = [];
     protected string $host = '';
     protected string $user = '';
     protected string $password = '';
@@ -41,11 +41,11 @@ class dataBase
      */
     public static function getInstance(string $dbname = ""): self
     {
-        if (self::$instance === null) {
-            self::$instance = new self($dbname);
+        if (self::$instances[$dbname] === null) {
+            self::$instances[$dbname] = new self($dbname);
         }
 
-        return self::$instance;
+        return self::$instances[$dbname];
     }
 
     /**
