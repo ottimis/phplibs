@@ -146,9 +146,8 @@ class Logger
 
             $error = $db->error();
             throw new RuntimeException("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
-        } else {
-            error_log("$note $code");
         }
+        error_log("$note $code");
     }
 
     /**
@@ -193,9 +192,8 @@ class Logger
 
             $error = $db->error();
             throw new RuntimeException("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
-        } else {
-            error_log("$note $code");
         }
+        error_log("$note $code");
     }
 
     /**
@@ -241,9 +239,8 @@ class Logger
 
             $error = $db->error();
             throw new RuntimeException("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
-        } else {
-            error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace(), JSON_THROW_ON_ERROR));
         }
+        error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace(), JSON_THROW_ON_ERROR));
     }
 
     /**
