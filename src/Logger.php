@@ -135,9 +135,9 @@ class Logger
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
-                "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', '%s')",
+                "INSERT INTO logs (`type`, `note`, `code`) VALUES (1, '%s', %s)",
                 $db->real_escape_string($note),
-                $db->real_escape_string($code)
+                is_null($code) ? "NULL" : "'" . $db->real_escape_string($code) . "'"
             );
             $ret = $db->query($sql);
             if ($ret) {
@@ -180,10 +180,10 @@ class Logger
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
-                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', '%s')",
+                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', %s)",
                 $db->real_escape_string(json_encode(debug_backtrace(), JSON_THROW_ON_ERROR)),
                 $db->real_escape_string($note),
-                $db->real_escape_string($code)
+                is_null($code) ? "NULL" : "'" . $db->real_escape_string($code) . "'"
             );
             $ret = $db->query($sql);
             Notify::notify("Logger warning", array("note" => $note));
@@ -229,10 +229,10 @@ class Logger
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
-                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', '%s')",
+                "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', %s)",
                 $db->real_escape_string(json_encode(debug_backtrace(), JSON_THROW_ON_ERROR)),
                 $db->real_escape_string($note),
-                $db->real_escape_string($code)
+                is_null($code) ? "NULL" : "'" . $db->real_escape_string($code) . "'"
             );
             $ret = $db->query($sql);
             if ($ret) {
