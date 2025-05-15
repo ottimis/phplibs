@@ -110,6 +110,10 @@ class RouteController
             }
             // Check if the property has the Validator attribute
             $validatorAttributes = $property->getAttributes(Validator::class);
+            if (empty($validatorAttributes)) {
+                $record[$propertyName] = $data[$propertyName] ?? null;
+                continue;
+            }
             foreach ($validatorAttributes as $attribute) {
                 $validator = $attribute->newInstance();
                 if ($validator->readOnly) {
