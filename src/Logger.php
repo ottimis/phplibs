@@ -161,26 +161,30 @@ class Logger
      */
     public function warning(string $note, string|null $code = null, $data = array())
     {
+        $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS));
+
         if ($this->logDriver === "logstash") {
             $this->logstashSend(array_merge([
                 'level' => 'warning',
                 'code' => $code,
                 'note' => $note,
-                'stacktrace' => json_encode(debug_backtrace(), JSON_THROW_ON_ERROR),
+                'stacktrace' => $backtrace,
             ], $data));
         } else if ($this->logDriver === "aws") {
             $this->awsCloudWatchSend(array_merge([
                 'level' => 'warning',
                 'code' => $code,
                 'note' => $note,
+                'stacktrace' => $backtrace,
             ], $data));
         } else if ($this->logDriver === "gelf" || $this->logDriver === "gelf-tcp") {
+            $data['stacktrace'] = $backtrace;
             $this->GelfLogger->warning($note, $data);
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (2, '%s', '%s', %s)",
-                $db->real_escape_string(json_encode(debug_backtrace(), JSON_THROW_ON_ERROR)),
+                $db->real_escape_string($backtrace),
                 $db->real_escape_string($note),
                 is_null($code) ? "NULL" : "'" . $db->real_escape_string($code) . "'"
             );
@@ -208,27 +212,31 @@ class Logger
     public function error(string $note, string|null $code = null, $data = array())
     {
         Notify::notify("Logger error", array("note" => $note));
+
+        $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS));
+
         if ($this->logDriver === "logstash") {
             $this->logstashSend(array_merge([
                 'level' => 'error',
                 'code' => $code,
                 'note' => $note,
-                'stacktrace' => json_encode(debug_backtrace(), JSON_THROW_ON_ERROR),
+                'stacktrace' => $backtrace,
             ], $data));
         } else if ($this->logDriver === "aws") {
             $this->awsCloudWatchSend(array_merge([
                 'level' => 'error',
                 'code' => $code,
                 'note' => $note,
-                'stacktrace' => json_encode(debug_backtrace(), JSON_THROW_ON_ERROR),
+                'stacktrace' => $backtrace,
             ], $data));
         } else if ($this->logDriver === "gelf" || $this->logDriver === "gelf-tcp") {
+            $data['stacktrace'] = $backtrace;
             $this->GelfLogger->error($note, $data);
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
                 "INSERT INTO logs (`type`, `stacktrace`, `note`, `code`) VALUES (3, '%s', '%s', %s)",
-                $db->real_escape_string(json_encode(debug_backtrace(), JSON_THROW_ON_ERROR)),
+                $db->real_escape_string($backtrace),
                 $db->real_escape_string($note),
                 is_null($code) ? "NULL" : "'" . $db->real_escape_string($code) . "'"
             );
