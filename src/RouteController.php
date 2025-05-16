@@ -5,6 +5,7 @@ namespace ottimis\phplibs;
 use Attribute;
 use Exception;
 use ottimis\phplibs\Middlewares\ValidationMiddleware;
+use ottimis\phplibs\schemas\Base\OGResponse;
 use ottimis\phplibs\schemas\STATUS;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 use ReflectionClass;
@@ -137,7 +138,7 @@ class RouteController
     /**
      * @throws Exception
      */
-    protected function get($id, $joinTables = [], $select = null): array
+    protected function get($id, $joinTables = [], $select = null): OGResponse
     {
         $this->checkDbConsistency();
         $arSql = [
@@ -164,16 +165,16 @@ class RouteController
         }
 
         $res = $res['data'][0];
-        return [
-            "success" => true,
-            "data" => $res
-        ];
+        return new OGResponse(
+            success: true,
+            data: $res,
+        );
     }
 
     /**
      * @throws Exception
      */
-    protected function list(array $q): array
+    protected function list(array $q): OGResponse
     {
         $this->checkDbConsistency();
         $arSql = [
@@ -189,18 +190,18 @@ class RouteController
             ]
         ];
 
-        $res = $this->Utils->dbSelect($arSql, $q);
+        $res = $this->Utils->select($arSql, $q);
 
-        return [
-            "success" => true,
-            "data" => $res
-        ];
+        return new OGResponse(
+            success: true,
+            data: $res
+        );
     }
 
     /**
      * @throws Exception
      */
-    public function delete(string $id): array
+    public function delete(string $id): OGResponse
     {
         $this->checkDbConsistency();
         $ar = array(
@@ -214,9 +215,9 @@ class RouteController
             throw new RuntimeException($res['error']);
         }
 
-        return [
-            "success" => true,
-        ];
+        return new OGResponse(
+            success: true,
+        );
     }
 
     // Metodo per mappare le rotte in modo statico per ciascun controller
@@ -240,7 +241,10 @@ class RouteController
                 $httpMethods = [strtoupper($matches[1])];
                 $methodAttributes = $method->getAttributes(Methods::class);
                 if (!empty($methodAttributes)) {
-                    $httpMethods = array_merge($httpMethods, array_map(fn($attr) => strtoupper($attr), $methodAttributes[0]->newInstance()->methods));
+                    $extra = $methodAttributes[0]->newInstance()->methods;
+                    foreach ($extra as $m) {
+                        $httpMethods[] = strtoupper($m);
+                    }
                     $httpMethods = array_unique($httpMethods);
                 }
 
@@ -253,8 +257,10 @@ class RouteController
                     $routePath = $basePath;
                 }
 
-                $middlewareNames = $method->getAttributes(Middleware::class);
-                $middlewareNames = array_merge($globalMiddlewareAttributes, $middlewareNames);
+                $middlewareNames = $globalMiddlewareAttributes;
+                foreach ($method->getAttributes(Middleware::class) as $mw) {
+                    $middlewareNames[] = $mw;
+                }
 
                 $routes[] = [
                     "httpMethods" => $httpMethods,
