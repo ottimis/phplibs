@@ -14,6 +14,7 @@ class Validator
 {
     public function __construct(
         public ?bool             $required = true,
+        public mixed             $default = null,
         public ?int              $minLength = null,
         public ?int              $maxLength = null,
         public ?string           $pattern = null,
@@ -39,6 +40,9 @@ class Validator
                 'success' => false,
                 'message' => 'Value is required',
             ];
+        }
+        if (empty($value) && !empty($this->default)) {
+            $value = $this->default;
         }
         if (empty($value)) {
             return [
