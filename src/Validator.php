@@ -75,6 +75,9 @@ class Validator
                 'message' => 'Value is not a valid date',
             ];
         }
+        if ($this->type !== null)   {
+            settype($value, $this->type->value);
+        }
         if ($this->type !== null && gettype($value) !== $this->type->value) {
             return [
                 'success' => false,
