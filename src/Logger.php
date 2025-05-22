@@ -161,7 +161,7 @@ class Logger
      */
     public function warning(string $note, string|null $code = null, $data = array())
     {
-        $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS));
+        $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), JSON_THROW_ON_ERROR);
 
         if ($this->logDriver === "logstash") {
             $this->logstashSend(array_merge([
@@ -213,7 +213,7 @@ class Logger
     {
         Notify::notify("Logger error", array("note" => $note));
 
-        $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS));
+        $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), JSON_THROW_ON_ERROR);
 
         if ($this->logDriver === "logstash") {
             $this->logstashSend(array_merge([
@@ -248,7 +248,7 @@ class Logger
             $error = $db->error();
             throw new RuntimeException("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
         }
-        error_log($note . " $code\r\n Stacktrace: " . json_encode(debug_backtrace(), JSON_THROW_ON_ERROR));
+        error_log($note . " $code\r\n Stacktrace: " . $backtrace);
     }
 
     /**
