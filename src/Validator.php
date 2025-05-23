@@ -75,7 +75,7 @@ class Validator
                 'message' => 'Value is not a valid date',
             ];
         }
-        if ($this->format === VALIDATOR_FORMAT::DATE_TIME && !DateTime::createFromFormat('Y-m-d H:i:s', $value)) {
+        if ($this->format === VALIDATOR_FORMAT::DATE_TIME && !DateTime::createFromFormat('Y-m-d\TH:i:s', $value)) {
             return [
                 'success' => false,
                 'message' => 'Value is not a valid datetime',
