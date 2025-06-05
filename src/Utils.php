@@ -373,7 +373,7 @@ class Utils
                                 $table,
                                 (!str_contains($fromField, ".") && !str_contains($fromField, "(")) ? "{$ar['from']}.{$fromField}" : $fromField,
                                 "{$alias}.$destinationField");
-                            if (!empty($ar['select']))  {
+                            if (!empty($ar['select']) && !empty($v['fields']))  {
                                 $ar['select'] .= ", ".implode(", ", array_map(static function ($f) use ($v, $alias) {
                                         return "{$alias}.{$f}";
                                     }, $v['fields']));
