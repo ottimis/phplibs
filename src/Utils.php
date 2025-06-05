@@ -6,6 +6,8 @@ use Exception;
 use JsonException;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 use RuntimeException;
+use Slim\Exception\HttpMethodNotAllowedException;
+use Slim\Exception\HttpNotFoundException;
 
 class Utils
 {
@@ -890,7 +892,7 @@ class Utils
             $logErrorDetails,
             $logger = null
         ) use ($app, $errorMessage) {
-            if ($exception instanceof \Slim\Exception\HttpNotFoundException) {
+            if ($exception instanceof HttpNotFoundException || $exception instanceof HttpMethodNotAllowedException) {
                 $response = $app->getResponseFactory()->createResponse();
                 $response->getBody()->write(file_get_contents(__DIR__ . "/404/1.html"));
                 return $response
