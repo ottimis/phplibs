@@ -313,7 +313,7 @@ class Utils
                             $ar[$key] = '';
                         }
                         foreach ($value as $k => $v) {
-                            if (!str_contains($v['field'], '.') && !str_contains($v['field'], '(')) {
+                            if (!empty($v["field"]) && !str_contains($v['field'], '.') && !str_contains($v['field'], '(')) {
                                 $v['field'] = "{$req['from']}.$v[field]";
                             }
 
