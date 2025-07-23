@@ -332,20 +332,13 @@ class RouteController
             $path = $uri->getPath();
 
             if ($path !== '/' && str_ends_with($path, '/')) {
-                // recursively remove slashes when its more than 1 slash
+                // recursively remove slashes when it's more than 1 slash
                 while (str_ends_with($path, '/')) {
                     $path = substr($path, 0, -1);
                 }
                 // permanently redirect paths with a trailing slash
                 // to their non-trailing counterpart
                 $uri = $uri->withPath($path);
-                if ($request->getMethod() === 'GET') {
-                    $response = new Response();
-                    return $response
-                        ->withHeader('Location', (string)$uri)
-                        ->withStatus(301);
-                }
-
                 $request = $request->withUri($uri);
             } else {
                 $request = $request->withUri($uri->withPath($path));
