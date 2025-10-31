@@ -225,8 +225,14 @@ class RouteController
     /**
      * @throws ReflectionException
      */
-    public static function mapControllerRoutes(App $app, string $controllerClass, string $basePath = ''): void
+    public static function mapControllerRoutes(App $app, string|array $controllerClass, string $basePath = ''): void
     {
+        if (is_array($controllerClass)) {
+            foreach ($controllerClass as $singleControllerClass) {
+                self::mapControllerRoutes($app, $singleControllerClass, $basePath);
+            }
+            return;
+        }
         $controllerInstance = new $controllerClass(); // Istanza temporanea solo per il reflection
         $reflection = new ReflectionClass($controllerInstance);
 
