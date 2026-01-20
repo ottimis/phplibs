@@ -1,0 +1,8 @@
+{
+  "skills": {
+    "phplibs": {
+      "path": ".claude/skills/phplibs.md",
+      "description": "Genera codice per ottimis/phplibs - Controller, Schema, Query"
+    }
+  }
+}
