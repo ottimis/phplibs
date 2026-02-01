@@ -913,10 +913,18 @@ class Utils
 
             try {
                 $Logger = Logger::getInstance();
-                $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData);
+                $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData, $exception);
             } catch (Exception $e) {
                 Notify::notify("Error in logging: " . $e->getMessage());
                 error_log("Error in logging: " . $e->getMessage());
+                // Fallback: direct Sentry capture if Logger itself fails
+                try {
+                    if (!empty(getenv("SENTRY_DSN"))) {
+                        \Sentry\captureException($exception);
+                    }
+                } catch (\Throwable $sentryError) {
+                    error_log("Sentry fallback failed: " . $sentryError->getMessage());
+                }
             }
 
             error_log(json_encode($logData, JSON_THROW_ON_ERROR), 0);

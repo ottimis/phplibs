@@ -648,6 +648,52 @@ class OrderController extends RouteController
 
 ---
 
+## Sentry Integration
+
+Sentry error tracking runs **in parallel** with the configured `LOG_DRIVER`. Only `error()` calls are sent to Sentry.
+
+### Environment Variables
+
+```env
+SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0   # Required to activate Sentry
+SENTRY_ENVIRONMENT=production    # Environment tag (default: production)
+SENTRY_RELEASE=1.2.3             # Release/version tag (optional)
+SENTRY_TRACES_SAMPLE_RATE=0.0    # Performance tracing rate (default: 0.0 = disabled)
+```
+
+### Behavior
+
+| Condition | Result |
+|-----------|--------|
+| `SENTRY_DSN` not set | Sentry is completely disabled, no overhead |
+| `SENTRY_DSN` set | Sentry initializes on Logger construction |
+| `error()` called | Event sent to Sentry with `service` and `error_code` tags |
+| `error()` with `$exception` | Full stack trace captured via `captureException()` |
+| `error()` without `$exception` | Message captured via `captureMessage()` |
+| Sentry unreachable | Silently fails, error logged to `error_log()` |
+
+### Usage
+
+```php
+$logger = Logger::getInstance();
+
+// Simple error message → captureMessage to Sentry
+$logger->error("Database connection failed", "DB_ERR");
+
+// With exception → captureException to Sentry (full stack trace)
+try {
+    riskyOperation();
+} catch (\Exception $e) {
+    $logger->error("Operation failed: " . $e->getMessage(), "OP_ERR", ["context" => "data"], $e);
+}
+```
+
+### Slim Error Handler
+
+`Utils::slimErrorHandler()` automatically passes the caught exception to Sentry via `Logger::error()`. If Logger itself fails, a direct Sentry fallback captures the exception.
+
+---
+
 ## Route Mapping Convention
 
 Controller methods follow this pattern:

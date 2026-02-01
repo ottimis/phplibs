@@ -31,6 +31,7 @@ class Logger
     protected CloudWatchLogsClient $CloudWatchClient;
     protected string $logGroupName;
     protected string $logStreamName;
+    protected bool $sentryInitialized = false;
 
     // Gelf Logger
     protected UdpTransport | TcpTransport $GelfTransport;
@@ -78,6 +79,26 @@ class Logger
             $this->GelfLogger = new GelfLogger($this->GelfPublisher, [
                 $this->logTagName => $this->serviceName,
             ]);
+        }
+
+        // Initialize Sentry (runs in parallel with any LOG_DRIVER)
+        $sentryDsn = getenv("SENTRY_DSN");
+        if (!empty($sentryDsn)) {
+            try {
+                \Sentry\init([
+                    'dsn' => $sentryDsn,
+                    'environment' => getenv("SENTRY_ENVIRONMENT") ?: 'production',
+                    'release' => getenv("SENTRY_RELEASE") ?: null,
+                    'traces_sample_rate' => (float)(getenv("SENTRY_TRACES_SAMPLE_RATE") ?: 0.0),
+                    'server_name' => gethostname(),
+                ]);
+                \Sentry\configureScope(function (\Sentry\State\Scope $scope): void {
+                    $scope->setTag('service', $this->serviceName);
+                });
+                $this->sentryInitialized = true;
+            } catch (\Throwable $e) {
+                error_log("Sentry initialization failed: " . $e->getMessage());
+            }
         }
     }
 
@@ -209,7 +230,7 @@ class Logger
      * @return bool|void
      * @throws Exception
      */
-    public function error(string $note, string|null $code = null, $data = array())
+    public function error(string $note, string|null $code = null, $data = array(), ?\Throwable $exception = null)
     {
         Notify::notify("Logger error", array("note" => $note));
 
@@ -248,6 +269,28 @@ class Logger
             $error = $db->error();
             throw new RuntimeException("Errore nella registrazione dell'errore...( $error ) Brutto!", 1);
         }
+
+        // Send to Sentry (in parallel with any LOG_DRIVER)
+        if ($this->sentryInitialized) {
+            try {
+                \Sentry\withScope(function (\Sentry\State\Scope $scope) use ($note, $code, $data, $exception): void {
+                    if ($code !== null) {
+                        $scope->setTag('error_code', $code);
+                    }
+                    if (!empty($data)) {
+                        $scope->setContext('extra_data', $data);
+                    }
+                    if ($exception !== null) {
+                        \Sentry\captureException($exception);
+                    } else {
+                        \Sentry\captureMessage($note, \Sentry\Severity::error());
+                    }
+                });
+            } catch (\Throwable $e) {
+                error_log("Sentry capture failed: " . $e->getMessage());
+            }
+        }
+
         error_log($note . " $code\r\n Stacktrace: " . $backtrace);
     }
 
