@@ -674,7 +674,7 @@ class Utils
             return $ret;
         }
 
-        $this->Log->warning('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
+        $this->Log->error('Errore query: ' . $sql . "\r\n DB message: " . $db->error(), "DBSLC2");
         $db->freeresult();
         return [
             "success" => false,
