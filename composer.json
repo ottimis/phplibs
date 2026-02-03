@@ -1,6 +1,6 @@
 {
   "name": "ottimis/phplibs",
-  "version": "4.12.1",
+  "version": "4.13.0",
   "keywords": [
     "release",
     "official",
@@ -30,6 +30,7 @@
   },
   "suggest": {
     "graylog2/gelf-php": "~2.0.1",
-    "phpmailer/phpmailer": "^v6.9.3"
+    "phpmailer/phpmailer": "^v6.9.3",
+    "ext-redis": "*"
   }
 }

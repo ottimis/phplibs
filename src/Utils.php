@@ -778,42 +778,72 @@ class Utils
         return $ar;
     }
 
-    public function _combo_list($req, $where = "", $log = false): false|array
+    /**
+     * @deprecated Use comboList() instead.
+     */
+    public function _combo_list(array $req, $where = "", $log = false): false|array
     {
         if (!isset($req['table'])) {
             return false;
         }
-        $table = $req['table'];
-        $value = $req['value'] ?? "id";
-        $text = $req['text'] ?? "text";
-        $other_field = isset($req['other_field']) ? "," . $req['other_field'] : "";
-        $order = $req['order'] ?? "text ASC";
-        $where = $req['where'] ?? "";
+        return $this->fetchCombo($req);
+    }
 
-        if ($where !== "") {
-            $where = " WHERE " . $where;
+    /**
+     * Fetch combo list data for dropdowns.
+     *
+     * Single mode:
+     *   comboList(["table" => "types", "text" => "name"])
+     *   Returns: [["id" => 1, "text" => "..."], ...]
+     *
+     * Batch mode:
+     *   comboList([
+     *       "types_list" => ["table" => "types", "text" => "name"],
+     *       "zones_list" => ["table" => "zones", "text" => "zone_name", "where" => "idstatus=1"],
+     *   ])
+     *   Returns: ["types_list" => [...], "zones_list" => [...]]
+     *
+     * Config keys: table (required), value (default: "id"), text (default: "text"),
+     *              other_field, order (default: "text ASC"), where, log.
+     */
+    public function comboList(array $req): array
+    {
+        if (isset($req['table'])) {
+            return $this->fetchCombo($req);
         }
 
+        $result = [];
+        foreach ($req as $key => $config) {
+            $result[$key] = $this->fetchCombo($config);
+        }
+        return $result;
+    }
+
+    private function fetchCombo(array $req): array
+    {
+        $value = $req['value'] ?? "id";
+        $text = $req['text'] ?? "text";
+        $otherField = isset($req['other_field']) ? ", " . $req['other_field'] : "";
+        $order = $req['order'] ?? "text ASC";
+        $whereClause = !empty($req['where']) ? " WHERE " . $req['where'] : "";
+
         $sql = sprintf(
-            "SELECT %s as id, %s as text %s
-					FROM %s
-					%s
-					ORDER BY %s",
+            "SELECT %s as id, %s as text%s FROM %s%s ORDER BY %s",
             $value,
             $text,
-            $other_field,
-            $table,
-            $where,
+            $otherField,
+            $req['table'],
+            $whereClause,
             $order
         );
 
-        if ($log) {
+        if (!empty($req['log'])) {
             $this->Log->log('Query: ' . $sql, "CL");
         }
 
         $db = $this->dataBase;
-        $res = $db->query($sql);
-        $ar = array();
+        $db->query($sql);
+        $ar = [];
         while ($rec = $db->fetchassoc()) {
             $ar[] = $rec;
         }
