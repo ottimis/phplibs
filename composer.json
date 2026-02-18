@@ -14,7 +14,7 @@
   },
   "require": {
     "aws/aws-sdk-php": "^3.330.2",
-    "firebase/php-jwt": "v6.10.2",
+    "firebase/php-jwt": "v7.0.0",
     "egulias/email-validator": "^4.0.2",
     "slim/slim": "4.14.0",
     "slim/psr7": "^1.7.0",
