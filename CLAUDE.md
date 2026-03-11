@@ -2,9 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Importante
+
+Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazioni, nuove classi), aggiornare anche la sezione `phplibs` in `/Users/mmoriani/CLAUDE.md` per mantenere il contesto globale allineato.
+
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v4.10.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction, routing, validation, logging, email, and HTTP utilities.
+**ottimis/phplibs** is a PHP library (v4.13.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction, routing, validation, logging, email, and HTTP utilities.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -323,6 +327,14 @@ $result = $utils->upsert(UPSERT_MODE::UPDATE, "users",
 
 ---
 
+### Deprecated Methods
+
+| Deprecato | Sostituto |
+|---|---|
+| `dbSelect()` | `select()` |
+| `dbSql()` | `upsert()` |
+| `_combo_list()` | `comboList()` |
+
 ### dbSelect() - Legacy Method
 
 Similar to `select()` but uses older join syntax:
@@ -344,10 +356,13 @@ $utils->dbSelect([
 
 ### Helper Methods
 
-#### _combo_list() - Dropdown Data
+#### comboList() - Dropdown Data
+
+Supports both single and batch mode. Detects mode by presence of `table` key.
 
 ```php
-$options = $utils->_combo_list([
+// Single combo
+$options = $utils->comboList([
     "table" => "categories",
     "value" => "id",           // default: "id"
     "text" => "name",          // default: "text"
@@ -356,7 +371,17 @@ $options = $utils->_combo_list([
     "where" => "active = 1",   // raw WHERE clause
 ]);
 // Returns: [["id" => 1, "text" => "Category 1"], ...]
+
+// Batch: multiple combos in one call
+$lists = $utils->comboList([
+    'category_list' => ["table" => "categories", "text" => "name", "order" => "name"],
+    'status_list' => ["table" => "statuses", "text" => "label"],
+    'zones_list' => ["table" => "zones", "text" => "zone_name", "where" => "idstatus=1"],
+]);
+// Returns: ['category_list' => [...], 'status_list' => [...], 'zones_list' => [...]]
 ```
+
+> **`_combo_list()` is deprecated** — use `comboList()` instead.
 
 #### slimErrorHandler() - Slim Error Middleware
 
