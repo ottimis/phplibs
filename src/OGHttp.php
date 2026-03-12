@@ -64,6 +64,9 @@ class OGHttp
         $headers = [
             'Content-Type: application/json'
         ];
+        if ($this->basicAuth) {
+            curl_setopt($curl, CURLOPT_USERPWD, $this->basicAuth['user'] . ":" . $this->basicAuth['pass']);
+        }
         if ($this->jwt) {
             $headers[] = "Authorization: Bearer $this->jwt";
         }
@@ -91,6 +94,16 @@ class OGHttp
     public function options($url): array
     {
         $curl = curl_init();
+
+        if ($this->basicAuth) {
+            curl_setopt($curl, CURLOPT_USERPWD, $this->basicAuth['user'] . ":" . $this->basicAuth['pass']);
+        }
+        if ($this->jwt) {
+            curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+                "Authorization: Bearer $this->jwt"
+            ));
+        }
+
         curl_setopt_array($curl, [
             CURLOPT_URL => $url,
             CURLOPT_CUSTOMREQUEST => "OPTIONS",
