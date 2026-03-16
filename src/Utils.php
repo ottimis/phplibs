@@ -602,7 +602,7 @@ class Utils
                 !empty($req['distinct']) ? 'DISTINCT' : '',
                 $ar['select'],
                 $ar['from'],
-                $ar['join'] ?? '',
+                $ar['join'] ?? $ar['leftJoin'] ?? '',
                 $ar['rightJoin'] ?? '',
                 $ar['innerJoin'] ?? '',
                 !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
@@ -616,7 +616,7 @@ class Utils
                 "DELETE %s FROM %s %s %s %s",
                 is_string($req['delete']) ? $req['delete'] : '',
                 $ar['from'],
-                $ar['join'] ?? '',
+                $ar['join'] ?? $ar['leftJoin'] ?? '',
                 !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
                 $ar['other'] ?? ''
             );
