@@ -763,3 +763,143 @@ public function _post(Request $request, Response $response) {
 - `STATUS::ACTIVE` (1) / `STATUS::CANCELLED` (2)
 - `VALIDATOR_TYPE::STRING`, `INTEGER`, `FLOAT`, `BOOLEAN`, `ARRAY`
 - `VALIDATOR_FORMAT::DATE`, `DATE_TIME`, `EMAIL`
+
+---
+
+## OGHttp Class (HTTP Client)
+
+Wrapper cURL per chiamate HTTP con supporto Basic Auth e JWT.
+
+### Instantiation
+
+```php
+use ottimis\phplibs\OGHttp;
+
+$http = new OGHttp();
+```
+
+### Authentication (Fluent)
+
+```php
+// Basic Auth
+$http->withBasicAuth('user', 'pass');
+
+// JWT Bearer token
+$http->withJwt($token);
+```
+
+### Methods
+
+```php
+$response = $http->get($url);
+$response = $http->post($url, $data);   // $data array, auto json_encode
+$response = $http->options($url);
+```
+
+### Return Value (IMPORTANT)
+
+**Tutti i metodi** ritornano lo stesso formato array:
+
+```php
+[
+    'body' => string,       // Raw response body (stringa, NON già decodificata)
+    'statusCode' => int,    // HTTP status code
+    'timeout' => bool,      // true se la richiesta è andata in timeout
+]
+```
+
+**⚠️ Errore comune**: `body` è una stringa raw. Per ottenere dati JSON, devi fare `json_decode()` manualmente:
+
+```php
+$response = $http->get('https://api.example.com/data');
+$data = json_decode($response['body'], true);  // ✅ Corretto
+
+// ❌ SBAGLIATO: $response NON è la risposta raw, è un array
+// $data = json_decode($response, true);
+```
+
+### Timeout
+
+Default: 30 secondi. Non configurabile dall'esterno (proprietà privata).
+
+---
+
+## OGCache Class (Redis Cache)
+
+Abstraction layer per Redis con prefix, singleton, e TTL.
+
+### Instantiation
+
+```php
+use ottimis\phplibs\OGCache;
+
+// ⚠️ IMPORTANTE: specificare SEMPRE un prefix per evitare collisioni tra app
+$cache = new OGCache("myapp");           // prefix "myapp:"
+$cache = OGCache::getInstance("myapp");  // singleton per prefix
+
+// Nuova istanza (non singleton)
+$cache = OGCache::createNew("myapp");
+```
+
+**⚠️ Errore comune**: `new OGCache()` senza prefix funziona ma le chiavi non hanno namespace, rischiando collisioni con altre app sullo stesso Redis.
+
+### Environment Variables
+
+```env
+REDIS_HOST=127.0.0.1              # oppure REDIS_SERVICE_HOST
+REDIS_PORT=6379                    # oppure REDIS_SERVICE_PORT
+REDIS_PASSWORD=                    # opzionale
+REDIS_DATABASE=0                   # opzionale, default 0
+REDIS_SCHEME=tcp                   # oppure REDIS_SERVICE_SCHEME, "tls" per connessioni TLS
+```
+
+### Methods
+
+```php
+$cache->get('key');                          // mixed|null
+$cache->set('key', $value, $ttl);           // bool, $ttl in secondi (0 = no scadenza)
+$cache->has('key');                          // bool
+$cache->delete('key1', 'key2');             // int (chiavi eliminate)
+$cache->clear('pattern*');                   // int (usa SCAN, non blocca)
+$cache->remember('key', $callback, $ttl);   // get or compute+cache
+$cache->increment('key', $by);              // int
+$cache->decrement('key', $by);              // int
+$cache->expire('key', $ttl);               // bool
+$cache->ttl('key');                          // int (-1 no scadenza, -2 non esiste)
+$cache->getRedis();                          // \Redis instance
+```
+
+### ⚠️ Requisito: ext-redis
+
+OGCache richiede l'estensione PHP `ext-redis` (`\Redis` class). Se non disponibile, il costruttore lancia un `Error` (non `Exception`).
+
+**Pattern corretto** per ambienti dove Redis potrebbe non essere disponibile:
+
+```php
+try {
+    $cache = new OGCache("myapp");
+    $data = $cache->remember('key', fn() => expensiveCall(), 1800);
+} catch (\Throwable $e) {  // ✅ \Throwable cattura sia Error che Exception
+    // Fallback senza cache
+    $data = expensiveCall();
+}
+
+// ❌ SBAGLIATO: catch (\Exception) NON cattura Error per classe mancante
+```
+
+### Pattern: Cache con fallback
+
+```php
+$instagram = new OGHttp();
+try {
+    $cache = new OGCache("myapp");
+    $posts = $cache->remember('instagram_feed', function() use ($instagram, $token) {
+        $response = $instagram->get("https://graph.instagram.com/me/media?access_token=$token");
+        $data = json_decode($response['body'], true);
+        return $data['data'] ?? [];
+    }, 1800);  // 30 minuti
+} catch (\Throwable $e) {
+    $response = $instagram->get("https://graph.instagram.com/me/media?access_token=$token");
+    $data = json_decode($response['body'], true);
+    $posts = $data['data'] ?? [];
+}
