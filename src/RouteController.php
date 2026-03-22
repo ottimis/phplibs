@@ -311,11 +311,9 @@ class RouteController
             // Middleware automatico di validazione dallo schema (se presente)
             $methodReflection = $reflection->getMethod($route['methodName']);
             $schemaAttr = $methodReflection->getAttributes(Schema::class);
-            if (!empty($schemaAttr)) {
-                $schemaClass = $schemaAttr[0]->newInstance()->class;
-            }
+            $schemaClass = !empty($schemaAttr) ? $schemaAttr[0]->newInstance()->class : null;
             foreach ($routeInstances as $routeInstance) {
-                $routeInstance->add(new ValidationMiddleware($controllerInstance, $schemaClass ?? null));
+                $routeInstance->add(new ValidationMiddleware($controllerInstance, $schemaClass));
             }
         }
     }
