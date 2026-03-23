@@ -4,9 +4,10 @@ namespace ottimis\phplibs;
 
 use mysqli;
 use mysqli_result;
+use ottimis\phplibs\Interfaces\DatabaseInterface;
 use RuntimeException;
 
-class dataBase
+class dataBase implements DatabaseInterface
 {
     private static array $instances = [];
     protected string $host = '';
@@ -34,28 +35,43 @@ class dataBase
     }
 
     /**
-     * Get the singleton instance of the class if it exists, otherwise create it
+     * Factory: returns MySQL or PostgreSQL adapter based on DB_DRIVER env var.
      *
      * @param string $dbname
-     * @return self
+     * @return DatabaseInterface
      */
-    public static function getInstance(string $dbname = "default"): self
+    public static function getInstance(string $dbname = "default"): DatabaseInterface
     {
         if (empty(self::$instances[$dbname])) {
-            self::$instances[$dbname] = new self($dbname);
+            $driver = $dbname === "default"
+                ? (getenv('DB_DRIVER') ?: 'mysql')
+                : (getenv('DB_DRIVER_' . $dbname) ?: (getenv('DB_DRIVER') ?: 'mysql'));
+
+            if ($driver === 'pgsql') {
+                self::$instances[$dbname] = new dataBasePgsql($dbname);
+            } else {
+                self::$instances[$dbname] = new self($dbname);
+            }
         }
 
         return self::$instances[$dbname];
     }
 
     /**
-     * Create new instance of the class
+     * Create new instance based on DB_DRIVER env var.
      *
      * @param string $dbname
-     * @return self
+     * @return DatabaseInterface
      */
-    public static function createNew(string $dbname = "default"): self
+    public static function createNew(string $dbname = "default"): DatabaseInterface
     {
+        $driver = $dbname === "default"
+            ? (getenv('DB_DRIVER') ?: 'mysql')
+            : (getenv('DB_DRIVER_' . $dbname) ?: (getenv('DB_DRIVER') ?: 'mysql'));
+
+        if ($driver === 'pgsql') {
+            return new dataBasePgsql($dbname);
+        }
         return new self($dbname);
     }
 
@@ -70,8 +86,6 @@ class dataBase
         return (mysqli_close($this->conn));
     }
 
-    // se error_reporting attivato riporto errore
-
     /**
      * String description of the last error and return mysqli_error() result
      *
@@ -83,7 +97,7 @@ class dataBase
     }
 
     /**
-     * Start a db transaction  and return mysqli_begin_transaction() result
+     * Start a db transaction and return mysqli_begin_transaction() result
      *
      * @return void
      */
@@ -91,7 +105,6 @@ class dataBase
     {
         mysqli_begin_transaction($this->conn);
     }
-
 
     /**
      * Commits the current transaction and return mysqli_commit() result
@@ -113,14 +126,11 @@ class dataBase
         mysqli_rollback($this->conn);
     }
 
-    // gruppo funzioni interrogazione
-
     /**
      * Performs a query on the database and return mysqli_query() result
      *
      * @param string $sql
-     *
-     * @return object|bool
+     * @return mysqli_result|bool
      */
     public function query(string $sql): mysqli_result|bool
     {
@@ -128,13 +138,10 @@ class dataBase
         return $this->result;
     }
 
-    // gruppo funzioni interrogazione
-
     /**
      * Performs a multi query on the database and return mysqli_multi_query() result
      *
      * @param string $sql
-     *
      * @return object|bool
      */
     public function multi_query(string $sql): mysqli_result|bool
@@ -144,7 +151,6 @@ class dataBase
 
     /**
      * Gets the number of affected rows in a previous MySQL operation
-     * and return mysqli_affected_rows() result
      *
      * @return string|int
      */
@@ -154,68 +160,76 @@ class dataBase
     }
 
     /**
-     * Gets the number of rows in the result set and
-     * return mysqli_num_rows() result
+     * Gets the number of rows in the result set.
+     * Pass $result for safe nested queries, otherwise uses the last query result.
      *
+     * @param mysqli_result|null $result
      * @return string|int
      */
-    public function numrows(): int|string
+    public function numrows(mixed $result = null): int|string
     {
-        return (mysqli_num_rows($this->result));
+        $r = $result ?? $this->result;
+        return (mysqli_num_rows($r));
     }
 
     /**
-     * Fetch the next row of a result set as an object and
-     * return mysqli_fetch_object() result
+     * Fetch the next row as an object.
+     * Pass $result for safe nested queries, otherwise uses the last query result.
      *
+     * @param mysqli_result|null $result
      * @return object|null|false
      */
-    public function fetchobject(): object|false|null
+    public function fetchobject(mixed $result = null): object|false|null
     {
-        return mysqli_fetch_object($this->result);
+        $r = $result ?? $this->result;
+        return mysqli_fetch_object($r);
     }
 
     /**
-     * Fetch the next row of a result set as an associative,
-     * a numeric array, or both and return mysqli_fetch_array() result
+     * Fetch the next row as an associative + numeric array.
+     * Pass $result for safe nested queries, otherwise uses the last query result.
      *
+     * @param mysqli_result|null $result
      * @return array|null|false
      */
-    public function fetcharray(): false|array|null
+    public function fetcharray(mixed $result = null): false|array|null
     {
-        return mysqli_fetch_array($this->result);
+        $r = $result ?? $this->result;
+        return mysqli_fetch_array($r);
     }
 
     /**
-     * Fetch the next row of a result set as an associative array
-     * and return mysqli_fetch_assoc() result
+     * Fetch the next row as an associative array.
+     * Pass $result for safe nested queries, otherwise uses the last query result.
      *
+     * @param mysqli_result|null $result
      * @return string[]|null|false
      */
-    public function fetchassoc(): array|false|null
+    public function fetchassoc(mixed $result = null): array|false|null
     {
-        return mysqli_fetch_assoc($this->result);
+        $r = $result ?? $this->result;
+        return mysqli_fetch_assoc($r);
     }
 
     /**
-     * Frees the memory associated with a result
+     * Frees the memory associated with a result.
+     * Pass $result for safe nested queries, otherwise frees the last query result.
      *
+     * @param mysqli_result|null $result
      * @return void
      */
-    public function freeresult(): void
+    public function freeresult(mixed $result = null): void
     {
-        if (!empty($this->result)) {
-            $this->result->free();
+        $r = $result ?? $this->result;
+        if (!empty($r) && $r instanceof mysqli_result) {
+            $r->free();
         }
     }
 
     /**
-     * Escapes special characters in a string for use in an SQL statement,
-     * taking into account the current charset of the connection
-     * and return mysqli_real_escape_string() result
+     * Escapes special characters in a string for use in an SQL statement
      *
      * @param string $param
-     *
      * @return string
      */
     public function real_escape_string(string $param): string
@@ -225,13 +239,17 @@ class dataBase
 
     /**
      * Returns the value generated for an AUTO_INCREMENT column by the last query
-     * with mysqli_insert_id() function
      *
      * @return int|string
      */
     public function insert_id(): int|string
     {
         return mysqli_insert_id($this->conn);
+    }
+
+    public function getDriver(): string
+    {
+        return 'mysql';
     }
 
     /**

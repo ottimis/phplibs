@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v4.13.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction, routing, validation, logging, email, and HTTP utilities.
+**ottimis/phplibs** is a PHP library (v5.1.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -24,11 +24,34 @@ composer dump-autoload    # Regenerate autoloader
 
 ## Architecture
 
-### Database Layer (Three Options)
+### Database Layer (Four Options)
 
-1. **`dataBase`** - MySQL/MariaDB via mysqli (singleton pattern)
-2. **`OGPdo`** - Multi-database PDO wrapper (MySQL, PostgreSQL, SQL Server, SQLite, Oracle)
-3. **`PdoConnect`** - SQL Server specific PDO wrapper
+1. **`dataBase`** - MySQL/MariaDB via mysqli (singleton pattern). Also acts as factory: `dataBase::getInstance()` returns MySQL or PostgreSQL adapter based on `DB_DRIVER` env var.
+2. **`dataBasePgsql`** - PostgreSQL via PDO (singleton pattern). Same interface as `dataBase` via `DatabaseInterface`.
+3. **`OGPdo`** - Multi-database PDO wrapper (MySQL, PostgreSQL, SQL Server, SQLite, Oracle)
+4. **`PdoConnect`** - SQL Server specific PDO wrapper
+
+#### Nested Queries (result-passing)
+
+I metodi `fetchassoc()`, `fetcharray()`, `fetchobject()`, `numrows()` e `freeresult()` accettano un parametro opzionale `$result`. Senza parametro funzionano come prima (usano l'ultimo result della query). Passando il result si evita la sovrascrittura in query annidate:
+
+```php
+$db = dataBase::getInstance();
+
+// ❌ SBAGLIATO: la query interna sovrascrive $this->result, il while esterno si rompe
+$db->query("SELECT * FROM users");
+while ($row = $db->fetchassoc()) {
+    $db->query("SELECT * FROM orders WHERE user_id = '{$row['id']}'");
+    $order = $db->fetchassoc();
+}
+
+// ✅ CORRETTO: ogni query usa il proprio result handle
+$res1 = $db->query("SELECT * FROM users");
+while ($row = $db->fetchassoc($res1)) {
+    $res2 = $db->query("SELECT * FROM orders WHERE user_id = '{$row['id']}'");
+    $order = $db->fetchassoc($res2);
+}
+```
 
 ### Core Classes
 
@@ -42,6 +65,8 @@ composer dump-autoload    # Regenerate autoloader
 ### Environment Variables
 
 Database:
+- `DB_DRIVER` — `mysql` (default) or `pgsql`. Controls which adapter `dataBase::getInstance()` returns
+- `DB_DRIVER_{name}` — Per-database driver override for named connections
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`
 - Multi-db: `DB_HOST_{name}`, `DB_USER_{name}`, etc.
 
@@ -167,6 +192,7 @@ $result = $utils->select([
         "alias" => "p",                  // optional, defaults to table name
         "on" => ["id_profile"],          // simple: main.id_profile = profiles.id
         "on" => ["id_profile", "id"],    // explicit: main.id_profile = profiles.id
+        "on" => ["p.id", "id_product", "lang = 'en'"],  // with extra ON condition
         "fields" => ["name", "bio"],     // auto-added to SELECT with alias prefix
     ],
     [
@@ -178,7 +204,18 @@ $result = $utils->select([
 ]
 ```
 
-**Join builds**: `{joinType} {table} {alias} ON {from}.{on[0]} = {alias}.{on[1] ?? 'id'}`
+**Join builds**: `{joinType} {table} {alias} ON {from}.{on[0]} = {alias}.{on[1] ?? 'id'}` + optional `AND {on[2]}`
+
+**on[2] — Extra ON condition**: Adds `AND condition` to the JOIN clause. If the condition doesn't contain `.`, it's auto-prefixed with the join alias. Useful for filtering translations or scoped joins:
+```php
+// Translation join: only match specific language
+"on" => ["p.id", "id_product", "lang = 'en'"]
+// → ON p.id = ptr.id_product AND ptr.lang = 'en'
+
+// With explicit table prefix (not auto-prefixed)
+"on" => ["p.id", "id_product", "ptr.lang = 'en'"]
+// → ON p.id = ptr.id_product AND ptr.lang = 'en'
+```
 
 #### Return Values
 
@@ -903,3 +940,118 @@ try {
     $data = json_decode($response['body'], true);
     $posts = $data['data'] ?? [];
 }
+```
+
+---
+
+## PostgreSQL Support (v5.1.0+)
+
+`Utils`, `RouteController` e tutto il query builder funzionano trasparentemente sia con MySQL che con PostgreSQL. Il driver si seleziona via env var.
+
+### Attivazione
+
+```env
+DB_DRIVER=pgsql          # 'mysql' (default) o 'pgsql'
+DB_DRIVER_secondary=pgsql # Per database multipli con nome
+```
+
+Se `DB_DRIVER` non è impostato, il comportamento è identico a prima (retrocompatibilità totale).
+
+### Come funziona
+
+- `dataBase::getInstance()` è una factory: restituisce `dataBase` (MySQL/mysqli) o `dataBasePgsql` (PostgreSQL/PDO) in base a `DB_DRIVER`
+- Entrambi implementano `DatabaseInterface` con la stessa API
+- `Utils` rileva il driver e adatta automaticamente la sintassi SQL:
+
+| Aspetto | MySQL | PostgreSQL |
+|---------|-------|------------|
+| Paginazione | `LIMIT offset, count` | `LIMIT count OFFSET offset` |
+| Conteggio totale | `SQL_CALC_FOUND_ROWS` + `FOUND_ROWS()` | Query `COUNT(*)` separata |
+| Upsert | `ON DUPLICATE KEY UPDATE` | `ON CONFLICT (...) DO UPDATE SET` |
+| Insert ID | `mysqli_insert_id()` | `RETURNING id` |
+| Ricerca testo | `LIKE` | `ILIKE` (case-insensitive) |
+| DELETE con JOIN | `DELETE alias FROM table JOIN...` | `DELETE FROM table USING ...` |
+
+### Upsert con PostgreSQL
+
+Per INSERT con `ON CONFLICT`, specificare le colonne di conflitto (default: `['id']`):
+
+```php
+// Default: conflict su 'id'
+$utils->upsert(UPSERT_MODE::INSERT, 'users', $data);
+
+// Conflict su colonna custom
+$utils->upsert(UPSERT_MODE::INSERT, 'users', $data, [], false, ['email']);
+
+// INSERT senza upsert (DO NOTHING su conflitto)
+$utils->upsert(UPSERT_MODE::INSERT, 'users', $data, [], true, ['id']);
+```
+
+### Requisiti
+
+- Estensione PHP `ext-pdo_pgsql`
+- PostgreSQL 12+
+
+---
+
+## OGVector Class (pgvector)
+
+Supporto per embedding vettoriali e ricerca per similarità con pgvector. Funziona solo con PostgreSQL.
+
+### Requisiti
+
+- PostgreSQL con estensione `pgvector` installata
+- `DB_DRIVER=pgsql`
+
+### Setup
+
+```php
+use ottimis\phplibs\OGVector;
+
+$vector = new OGVector();              // usa connessione default
+$vector = new OGVector("secondary");   // connessione named
+
+// Abilita estensione pgvector
+$vector->createExtension();
+
+// Aggiungi colonna vector a tabella esistente
+$vector->addVectorColumn('documents', 'embedding', 1536); // 1536 dimensioni (OpenAI)
+
+// Crea indice per ricerca veloce
+$vector->createIndex('documents', 'embedding', 'ivfflat', 'vector_cosine_ops', ['lists' => 100]);
+// oppure HNSW (più veloce per query, più lento per build):
+$vector->createIndex('documents', 'embedding', 'hnsw', 'vector_cosine_ops');
+```
+
+### Upsert con embedding
+
+```php
+$result = $vector->upsert(
+    'documents',                          // tabella
+    ['title' => 'My doc', 'content' => '...'], // dati
+    'embedding',                          // colonna vector
+    [0.1, 0.2, 0.3, ...],               // array di float
+    ['id']                                // conflict keys
+);
+// $result['success'], $result['id']
+```
+
+### Ricerca per similarità
+
+```php
+// Cosine similarity (più usata per RAG)
+$results = $vector->search(
+    'documents',           // tabella
+    'embedding',           // colonna vector
+    $queryEmbedding,       // array di float
+    10,                    // limit
+    ['tenant_id' => $id], // filtri WHERE opzionali
+    ['id', 'title', 'content'] // campi da selezionare
+);
+// $results['data'] = [['id' => 1, 'title' => '...', 'similarity' => 0.95], ...]
+
+// Distanza L2 (Euclidea)
+$results = $vector->searchL2('documents', 'embedding', $queryEmbedding, 10);
+
+// Inner product
+$results = $vector->searchInnerProduct('documents', 'embedding', $queryEmbedding, 10);

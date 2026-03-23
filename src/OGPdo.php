@@ -21,6 +21,8 @@ class OGPdo
     protected bool $debug;
     protected PDOStatement $result;
 
+    protected DBEngine $dbEngine;
+
     public function __construct($db = '', $engine = DBEngine::SQLSRV)
     {
         $this->host = ($db !== '') ? getenv('DB_HOST_' . $db) : getenv('DB_HOST');
@@ -28,11 +30,14 @@ class OGPdo
         $this->password = ($db !== '') ? getenv('DB_PASSWORD_' . $db) : getenv('DB_PASSWORD');
         $this->database = ($db !== '') ? getenv('DB_NAME_' . $db) : getenv('DB_NAME');
         $this->port = ($db !== '') ? getenv('DB_PORT_' . $db) : getenv('DB_PORT');
+        $this->dbEngine = $engine;
 
         $connectionString = $this->buildConnectionString($engine);
         $this->conn = new PDO($connectionString, $this->user, $this->password);
 
-        $this->conn->setAttribute(PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
+        if ($engine === DBEngine::SQLSRV) {
+            $this->conn->setAttribute(PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
+        }
         $this->debug = false;
     }
 
@@ -604,7 +609,11 @@ class OGPdo
                         if (!isset($ar[$key])) {
                             $ar[$key] = '';
                         }
-                        $ar[$key] .= sprintf("OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", $value[0], $value[1]);
+                        $ar[$key] .= match ($this->dbEngine) {
+                            DBEngine::MYSQL => sprintf("LIMIT %d, %d", $value[0], $value[1]),
+                            DBEngine::PGSQL => sprintf("LIMIT %d OFFSET %d", $value[1], $value[0]),
+                            default => sprintf("OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", $value[0], $value[1]),
+                        };
                         break;
 
                     default:
@@ -714,7 +723,11 @@ class OGPdo
         if (isset($paging['p']) && isset($paging['c'])) {
             $count = $paging['c'] != "" ? ($paging['c']) : 20;
             $start = $paging['p'] != "" ? ($paging['p'] - 1) * $count : 0;
-            $ar["limit"] = "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY";
+            $ar["limit"] = match ($this->dbEngine) {
+                DBEngine::MYSQL => "LIMIT $start, $count",
+                DBEngine::PGSQL => "LIMIT $count OFFSET $start",
+                default => "OFFSET $start ROWS FETCH NEXT $count ROWS ONLY",
+            };
         }
         return array("sql" => $ar, "params" => $params);
     }

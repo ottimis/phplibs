@@ -4,6 +4,7 @@ namespace ottimis\phplibs;
 
 use Exception;
 use JsonException;
+use ottimis\phplibs\Interfaces\DatabaseInterface;
 use ottimis\phplibs\schemas\UPSERT_MODE;
 use RuntimeException;
 use Slim\Exception\HttpMethodNotAllowedException;
@@ -12,8 +13,9 @@ use Slim\Exception\HttpNotFoundException;
 class Utils
 {
     private static array $instances = [];
-    public dataBase $dataBase;
+    public DatabaseInterface $dataBase;
     public LoggerPdo|Logger $Log;
+    private string $driver;
 
     public function __construct($dbName = "default", $singleton = true)
     {
@@ -22,7 +24,13 @@ class Utils
         } else {
             $this->dataBase = dataBase::createNew($dbName);
         }
+        $this->driver = $this->dataBase->getDriver();
         $this->Log = getenv('LOG_DB_TYPE') === 'mssql' ? new LoggerPdo() : Logger::getInstance();
+    }
+
+    private function isPgsql(): bool
+    {
+        return $this->driver === 'pgsql';
     }
 
     /**
@@ -124,15 +132,16 @@ class Utils
         }
     }
 
-    public function upsert(UPSERT_MODE $mode, string $table, array $ar, array $fieldWhere = [], $noUpdate = false): array
+    public function upsert(UPSERT_MODE $mode, string $table, array $ar, array $fieldWhere = [], $noUpdate = false, array $conflictKeys = ['id']): array
     {
         $db = $this->dataBase;
+        $isPgsql = $this->isPgsql();
 
         // Filter special keys like "now()" and null
         $ar = array_map(/**
          * @throws JsonException
          */ static function ($value) use ($db) {
-            return match (true) { // Usare 'true' per gestire condizioni complesse
+            return match (true) {
                 $value === 'now()' => "now()",
                 $value === true => 1,
                 $value === false => 0,
@@ -155,7 +164,20 @@ class Utils
                 $values = implode(", ", $ar);
                 $sql = "INSERT INTO $table ($columns) VALUES ($values)";
                 if (!$noUpdate) {
-                    $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
+                    if ($isPgsql) {
+                        $conflictCols = implode(", ", $conflictKeys);
+                        // PG ON CONFLICT uses EXCLUDED.column to reference the new values
+                        $excludedAr = array_map(static fn($k) => "$k=EXCLUDED.$k", array_keys($ar));
+                        $sql .= " ON CONFLICT ($conflictCols) DO UPDATE SET " . implode(", ", $excludedAr);
+                    } else {
+                        $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
+                    }
+                } elseif ($isPgsql) {
+                    $conflictCols = implode(", ", $conflictKeys);
+                    $sql .= " ON CONFLICT ($conflictCols) DO NOTHING";
+                }
+                if ($isPgsql) {
+                    $sql .= " RETURNING id";
                 }
             } else {
                 $where = implode(" AND ", array_map(static function ($v, $k) use ($db) {
@@ -178,7 +200,7 @@ class Utils
             }
             return $ret;
         } catch (Exception $e) {
-            $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
+            $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . ($sql ?? ''), "DBSQL");
             $ret['success'] = 0;
             $ret['error'] = $e->getMessage();
             return $ret;
@@ -258,7 +280,11 @@ class Utils
                         if (!isset($ar[$key])) {
                             $ar[$key] = '';
                         }
-                        $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+                        if ($this->isPgsql()) {
+                            $ar[$key] .= sprintf("%d OFFSET %d", $value[1], $value[0]);
+                        } else {
+                            $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+                        }
                         break;
 
                     default:
@@ -366,15 +392,19 @@ class Utils
                         };
                         # Build join
                         foreach ($value as $v) {
-                            $destinationField = is_array($v['on']) && !empty($v['on'][1]) ? $v['on'][1] : "id";
-                            $fromField = is_array($v['on']) ? $v['on'][0] : $v['on'];
+                            $onArray = is_array($v['on']) ? $v['on'] : [$v['on']];
+                            $fromField = $onArray[0];
+                            $destinationField = $onArray[1] ?? 'id';
                             $table = $v['table'] . (isset($v['alias']) ? " " . $v['alias'] : "");
                             $alias = $v['alias'] ?? $v['table'];
-                            $ar[$key] .= sprintf("%s %s ON %s=%s ",
-                                $joinType,
-                                $table,
+                            $onClause = sprintf("%s=%s",
                                 (!str_contains($fromField, ".") && !str_contains($fromField, "(")) ? "{$ar['from']}.{$fromField}" : $fromField,
                                 "{$alias}.$destinationField");
+                            // on[2]: condizione aggiuntiva sulla clausola ON (es. "lang = 'en'")
+                            if (!empty($onArray[2])) {
+                                $onClause .= " AND " . (str_contains($onArray[2], '.') ? $onArray[2] : "{$alias}.{$onArray[2]}");
+                            }
+                            $ar[$key] .= sprintf("%s %s ON %s ", $joinType, $table, $onClause);
                             if (!empty($ar['select']) && !empty($v['fields']))  {
                                 $ar['select'] .= ", ".implode(", ", array_map(static function ($f) use ($v, $alias) {
                                         return "{$alias}.{$f}";
@@ -383,7 +413,11 @@ class Utils
                         }
                         break;
                     case 'limit':
-                        $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+                        if ($this->isPgsql()) {
+                            $ar[$key] .= sprintf("%d OFFSET %d", $value[1], $value[0]);
+                        } else {
+                            $ar[$key] .= sprintf("%d, %d", $value[0], $value[1]);
+                        }
                         break;
 
                     default:
@@ -492,14 +526,26 @@ class Utils
                 isset($ar['other']) ? $ar['other'] : ''
             );
         } elseif (isset($req['delete'])) {
-            $sql = sprintf(
-                "DELETE %s FROM %s %s %s %s",
-                gettype($req['delete']) == 'string' ? $req['delete'] : '',
-                $ar['from'],
-                isset($ar['join']) ? $ar['join'] : '',
-                isset($ar['where']) ? "WHERE " . $ar['where'] : '',
-                isset($ar['other']) ? $ar['other'] : ''
-            );
+            if ($this->isPgsql() && !empty($ar['join'])) {
+                // PostgreSQL: DELETE FROM table USING join_table WHERE ...
+                $sql = sprintf(
+                    "DELETE FROM %s USING %s %s %s",
+                    $ar['from'],
+                    // Extract table references from JOIN clauses (strip "LEFT JOIN" prefix)
+                    preg_replace('/(?:LEFT|RIGHT|INNER)?\s*JOIN\s+/i', '', $ar['join'] ?? ''),
+                    isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    isset($ar['other']) ? $ar['other'] : ''
+                );
+            } else {
+                $sql = sprintf(
+                    "DELETE %s FROM %s %s %s %s",
+                    gettype($req['delete']) == 'string' ? $req['delete'] : '',
+                    $ar['from'],
+                    isset($ar['join']) ? $ar['join'] : '',
+                    isset($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    isset($ar['other']) ? $ar['other'] : ''
+                );
+            }
         }
 
         if (isset($req['log']) && $req['log']) {
@@ -508,6 +554,20 @@ class Utils
 
         if ($sqlOnly) {
             return $sql;
+        }
+
+        // For PG with paging/count, store the count SQL before executing the main query
+        $needsCount = isset($req['count']) || count($paging) > 0;
+        $countSql = '';
+        if ($needsCount && $this->isPgsql() && isset($req['select'])) {
+            $countSql = sprintf(
+                "SELECT COUNT(*) as total FROM %s %s %s %s %s",
+                $ar['from'],
+                isset($ar['join']) ? $ar['join'] : '',
+                isset($ar['rightJoin']) ? $ar['rightJoin'] : '',
+                isset($ar['innerJoin']) ? $ar['innerJoin'] : '',
+                isset($ar['where']) ? "WHERE " . $ar['where'] : ''
+            );
         }
 
         $res = $db->query($sql);
@@ -533,10 +593,16 @@ class Utils
                     $ret['data'][] = $rec;
                 }
             }
-            if (isset($req['count']) || sizeof($paging) > 0) {
-                $db->query("SELECT FOUND_ROWS()");
-                $ret['total'] = intval($db->fetcharray()[0]);
-                $ret['count'] = sizeof($ret['data']);
+            if ($needsCount) {
+                if ($this->isPgsql()) {
+                    $db->query($countSql);
+                    $row = $db->fetchassoc();
+                    $ret['total'] = (int)($row['total'] ?? 0);
+                } else {
+                    $db->query("SELECT FOUND_ROWS()");
+                    $ret['total'] = (int)$db->fetcharray()[0];
+                }
+                $ret['count'] = count($ret['data']);
                 $ret['rows'] = $ret['data'];
                 unset($ret['data']);
             }
@@ -612,14 +678,25 @@ class Utils
                 $ar['other'] ?? ''
             );
         } elseif (isset($req['delete'])) {
-            $sql = sprintf(
-                "DELETE %s FROM %s %s %s %s",
-                is_string($req['delete']) ? $req['delete'] : '',
-                $ar['from'],
-                $ar['join'] ?? $ar['leftJoin'] ?? '',
-                !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
-                $ar['other'] ?? ''
-            );
+            $joinClause = $ar['join'] ?? $ar['leftJoin'] ?? '';
+            if (!empty($joinClause) && $this->isPgsql()) {
+                $sql = sprintf(
+                    "DELETE FROM %s USING %s %s %s",
+                    $ar['from'],
+                    preg_replace('/(?:LEFT|RIGHT|INNER)?\s*JOIN\s+/i', '', $joinClause),
+                    !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    $ar['other'] ?? ''
+                );
+            } else {
+                $sql = sprintf(
+                    "DELETE %s FROM %s %s %s %s",
+                    is_string($req['delete']) ? $req['delete'] : '',
+                    $ar['from'],
+                    $joinClause,
+                    !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
+                    $ar['other'] ?? ''
+                );
+            }
         }
 
         if (isset($req['log']) && $req['log']) {
@@ -628,6 +705,21 @@ class Utils
 
         if ($sqlOnly) {
             return $sql;
+        }
+
+        // For PG with paging/count, prepare the count SQL
+        $needsCount = isset($req['count']) || count($paging) > 0;
+        $countSql = '';
+        if ($needsCount && isset($req['select']) && $this->isPgsql()) {
+            $countSql = sprintf(
+                "SELECT COUNT(*) as total FROM %s %s %s %s %s %s",
+                $ar['from'],
+                $ar['join'] ?? $ar['leftJoin'] ?? '',
+                $ar['rightJoin'] ?? '',
+                $ar['innerJoin'] ?? '',
+                !empty($ar['where']) ? "WHERE " . $ar['where'] : '',
+                !empty($ar['group']) ? "GROUP BY " . $ar['group'] : ''
+            );
         }
 
         $res = $db->query($sql);
@@ -662,9 +754,15 @@ class Utils
                     $ret['data'][] = $rec;
                 }
             }
-            if (isset($req['count']) || count($paging) > 0) {
-                $db->query("SELECT FOUND_ROWS()");
-                $ret['total'] = (int)$db->fetcharray()[0];
+            if ($needsCount) {
+                if ($this->isPgsql()) {
+                    $db->query($countSql);
+                    $row = $db->fetchassoc();
+                    $ret['total'] = (int)($row['total'] ?? 0);
+                } else {
+                    $db->query("SELECT FOUND_ROWS()");
+                    $ret['total'] = (int)$db->fetcharray()[0];
+                }
                 $ret['count'] = count($ret['data']);
                 $ret['rows'] = $ret['data'];
                 unset($ret['data']);
@@ -684,6 +782,8 @@ class Utils
 
     private function buildPaging($ar, $paging)
     {
+        $likeOp = $this->isPgsql() ? 'ILIKE' : 'like';
+
         // Foreach filterable fields, add to where with and condition and =
         if (!empty($paging['filterableFields']))    {
             $filterWhere = array();
@@ -704,7 +804,7 @@ class Utils
         if (isset($paging['s'], $paging['searchableFields']) && strlen($paging['s']) > 1) {
             $searchWhere = array();
             foreach ($paging['searchableFields'] as $v) {
-                $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
+                $searchWhere[] = sprintf("$v $likeOp '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
             }
             $stringSearch = implode(" OR ", $searchWhere);
             if (isset($ar['where'])) {
@@ -719,9 +819,13 @@ class Utils
         if (isset($paging['p'], $paging['c'])) {
             $count = $paging['c'] !== "" ? ($paging['c']) : 20;
             $start = $paging['p'] !== "" ? ($paging['p'] - 1) * $count : 0;
-            $ar["limit"] = "$start, $count";
+            if ($this->isPgsql()) {
+                $ar["limit"] = "$count OFFSET $start";
+            } else {
+                $ar["limit"] = "$start, $count";
+            }
         }
-        if (empty($paging['noTotal'])) {
+        if (empty($paging['noTotal']) && !$this->isPgsql()) {
             $ar["select"] = "SQL_CALC_FOUND_ROWS " . $ar["select"];
         }
         return $ar;
@@ -729,6 +833,8 @@ class Utils
 
     private function buildPagingV2($ar, $paging)
     {
+        $likeOp = $this->isPgsql() ? 'ILIKE' : 'like';
+
         // Foreach filterable fields, add to where with and condition and =
         if (!empty($paging['filterableFields']))    {
             $filterWhere = array();
@@ -752,7 +858,7 @@ class Utils
             $searchWhere = array();
             foreach ($paging['searchableFields'] as $k => $v) {
                 $v = !str_contains($v, '.') ? "{$ar['from']}.$v" : $v;
-                $searchWhere[] = sprintf("$v like '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
+                $searchWhere[] = sprintf("$v $likeOp '%%%s%%'", $this->dataBase->real_escape_string($paging['s']));
             }
             $stringSearch = implode(" OR ", $searchWhere);
             if (isset($ar['where'])) {
@@ -770,9 +876,13 @@ class Utils
         if (isset($paging['p'], $paging['c'])) {
             $count = $paging['c'] !== "" ? ($paging['c']) : 20;
             $start = $paging['p'] !== "" ? ($paging['p'] - 1) * $count : 0;
-            $ar["limit"] = "$start, $count";
+            if ($this->isPgsql()) {
+                $ar["limit"] = "$count OFFSET $start";
+            } else {
+                $ar["limit"] = "$start, $count";
+            }
         }
-        if (empty($paging['noTotal'])) {
+        if (empty($paging['noTotal']) && !$this->isPgsql()) {
             $ar["select"] = "SQL_CALC_FOUND_ROWS " . $ar["select"];
         }
         return $ar;
