@@ -722,8 +722,8 @@ class Utils
             );
         }
 
-        $res = $db->query($sql);
-        if ($res) {
+        $queryResult = $db->query($sql);
+        if ($queryResult) {
             if (isset($req['delete'])) {
                 return [
                     "success" => true
@@ -733,11 +733,12 @@ class Utils
             $ret = [
                 "data" => []
             ];
-            // First take all records
+            // First take all records using explicit result handle
             $records = [];
-            while ($rec = $db->fetchassoc()) {
+            while ($rec = $db->fetchassoc($queryResult)) {
                 $records[] = $rec;
             }
+            $db->freeresult($queryResult);
             // Then process them. -> This allows us to have nested queries
             foreach ($records as $rec)    {
                 if (isset($req['decode'])) {
@@ -767,7 +768,6 @@ class Utils
                 $ret['rows'] = $ret['data'];
                 unset($ret['data']);
             }
-            $db->freeresult();
             $ret['success'] = true;
             return $ret;
         }
