@@ -413,6 +413,9 @@ class Utils
                         }
                         break;
                     case 'limit':
+                        if (!isset($ar[$key])) {
+                            $ar[$key] = '';
+                        }
                         if ($this->isPgsql()) {
                             $ar[$key] .= sprintf("%d OFFSET %d", $value[1], $value[0]);
                         } else {
