@@ -46,7 +46,8 @@ class OGPdo
         $connString = "";
         switch ($engine) {
             case DBEngine::SQLSRV:
-                $connString = "sqlsrv:Server=$this->host,$this->port;Database=$this->database;TrustServerCertificate=true";
+                $server = !empty($this->port) ? "$this->host,$this->port" : $this->host;
+                $connString = "sqlsrv:Server=$server;Database=$this->database;TrustServerCertificate=true";
                 break;
             case DBEngine::MYSQL:
                 $connString = "mysql:host=$this->host;dbname=$this->database";
