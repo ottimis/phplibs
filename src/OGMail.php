@@ -270,9 +270,10 @@ class OGMail
         // New lines are required for the MIME boundary!!! Do not remove them!
         $boundary = uniqid(mt_rand(), true);
         $alternativeBoundary = 'ALT-' . uniqid(mt_rand(), true);
+        $topContentType = !empty($this->attaches) ? 'multipart/mixed' : 'multipart/related';
         $mime_headers = [
             'MIME-Version: 1.0',
-            'Content-Type: multipart/related; boundary="' . $boundary . '"',
+            'Content-Type: ' . $topContentType . '; boundary="' . $boundary . '"',
             'Content-Transfer-Encoding: 7bit',
             'Subject: ' . $this->mailSubject,
         ];
@@ -308,6 +309,21 @@ class OGMail
             Content-Disposition: inline;
 
             {$image_data}
+
+            EOT;
+        }
+
+        foreach ($this->attaches as $attach) {
+            $fileData = base64_encode(file_get_contents($attach->path));
+            $mimeType = mime_content_type($attach->path) ?: 'application/octet-stream';
+            $fileName = $attach->name;
+            $html_body .= <<<EOT
+            --{$boundary}
+            Content-Type: $mimeType; name="$fileName"
+            Content-Transfer-Encoding: base64
+            Content-Disposition: attachment; filename="$fileName"
+
+            {$fileData}
 
             EOT;
         }
