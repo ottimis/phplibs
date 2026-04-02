@@ -39,7 +39,7 @@ class OGMail
                 'version' => 'latest',
             ];
             if (getenv('ENV') === 'local')   {
-                $provider = CredentialProvider::sso(getenv("S3_PROFILE_NAME"));
+                $provider = CredentialProvider::sso(getenv("AWS_PROFILE_NAME"));
                 $config['credentials'] = $provider;
             }
             $this->SESClient = new SesV2Client($config);
