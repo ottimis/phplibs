@@ -14,7 +14,7 @@ class dataBase implements DatabaseInterface
     protected string $user = '';
     protected string $password = '';
     protected string $database = '';
-    protected string $port = '';
+    protected int $port = 3306;
     protected bool $persistent = false;
     protected mysqli|null $conn = NULL;
     protected mysqli_result|bool $result;
@@ -26,7 +26,10 @@ class dataBase implements DatabaseInterface
         $this->user = ($dbname === "default" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
         $this->password = ($dbname === "default" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));
         $this->database = ($dbname === "default" ? getenv('DB_NAME') : getenv('DB_NAME_' . $dbname));
-        $this->port = ($dbname === "default" ? (getenv('DB_PORT') ? getenv('DB_PORT') : 3306) : getenv('DB_PORT_' . $dbname));
+        $portValue = $dbname === "default"
+            ? (getenv('DB_PORT') !== false ? getenv('DB_PORT') : 3306)
+            : (getenv('DB_PORT_' . $dbname) !== false ? getenv('DB_PORT_' . $dbname) : 3306);
+        $this->port = (int) $portValue;
 
         $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error());
         if (getenv("SQL_MODE_LEGACY") === "true") {

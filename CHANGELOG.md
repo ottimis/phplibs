@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.1] - 2026-04-07
+
+### Fixed
+
+- Risolto un bug nel fallback della porta del database se le variabili d'ambiente personalizzate non sono definite (ora ritorna sempre `3306` di default).
+- Aggiunto type casting esplicito a `int` per la porta in `dataBase.php` per evitare errori "Strict Type" in PHP 8.1+ con `mysqli_connect()`.
+
 ## [5.0.0] - 2026-03-11
 
 ### Breaking Changes
