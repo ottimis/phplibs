@@ -22,6 +22,9 @@ class dataBase implements DatabaseInterface
 
     public function __construct($dbname = "default")
     {
+        if ($dbname === "") {
+            $dbname = "default";
+        }
         $this->host = ($dbname === "default" ? getenv('DB_HOST') : getenv('DB_HOST_' . $dbname));
         $this->user = ($dbname === "default" ? getenv('DB_USER') : getenv('DB_USER_' . $dbname));
         $this->password = ($dbname === "default" ? getenv('DB_PASSWORD') : getenv('DB_PASSWORD_' . $dbname));

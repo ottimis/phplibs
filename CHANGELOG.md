@@ -1,5 +1,11 @@
 # Changelog
 
+## [5.2.2] - 2026-04-10
+
+### Fixed
+
+- Risolto un bug per cui passare una stringa vuota `""` come `$dbname` in `dataBase::__construct()` e `Utils::__construct()` causava la ricerca di variabili d'ambiente inesistenti (`DB_HOST_`, `DB_USER_`, ecc.), risultando in una connessione fallita. Una stringa vuota viene ora normalizzata a `"default"`. Introdotto in v5.1.0.
+
 ## [5.2.1] - 2026-04-07
 
 ### Fixed
