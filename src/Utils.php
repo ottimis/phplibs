@@ -497,6 +497,8 @@ class Utils
 
         if (sizeof($paging) > 0) {
             $ar = $this->buildPaging($ar, $paging);
+        } elseif ((isset($req['count']) || count($paging) > 0) && !$this->isPgsql() && isset($ar['limit'])) {
+            $ar['select'] = 'SQL_CALC_FOUND_ROWS ' . $ar['select'];
         }
 
         $ctes = [];
