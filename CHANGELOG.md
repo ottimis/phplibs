@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Risolto un bug in `dbSelect()` per cui `SQL_CALC_FOUND_ROWS` non veniva aggiunto alla query quando `limit` era passato direttamente nelle opzioni (invece che tramite `$paging`). In questo caso `FOUND_ROWS()` restituiva il numero di righe della pagina corrente invece del totale, rendendo la paginazione non funzionante. Introdotto in v5.1.0.
+- Risolto un bug in `dbSelect()` per cui `SQL_CALC_FOUND_ROWS` non veniva aggiunto alla query quando `limit` era passato direttamente nelle opzioni (invece che tramite `$paging`). In questo caso `FOUND_ROWS()` restituiva il numero di righe della pagina corrente invece del totale, rendendo la paginazione non funzionante. (`src/Utils.php`)
 
 ## [5.2.2] - 2026-04-10
 
