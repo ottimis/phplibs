@@ -1,5 +1,11 @@
 # Changelog
 
+## [5.2.3] - 2026-04-21
+
+### Added
+
+- Aggiunto supporto per la variabile d'ambiente `SQL_MODE` che permette di impostare flag SQL specifici per sessione. Utile per la migrazione graduale dalla modalità legacy (`SQL_MODE_LEGACY=true`) alla modalità strict di MariaDB/MySQL.
+
 ## [5.2.2] - 2026-04-10
 
 ### Fixed

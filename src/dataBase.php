@@ -37,6 +37,8 @@ class dataBase implements DatabaseInterface
         $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error());
         if (getenv("SQL_MODE_LEGACY") === "true") {
             $this->query("SET sql_mode = '';");
+        } elseif (getenv("SQL_MODE") !== false) {
+            $this->query("SET sql_mode = '" . getenv("SQL_MODE") . "';");
         }
     }
 
