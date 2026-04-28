@@ -3,6 +3,7 @@
 namespace ottimis\phplibs;
 
 use Aws\CloudWatchLogs\CloudWatchLogsClient;
+use Aws\Credentials\CredentialProvider;
 use Exception;
 use Gelf\Logger as GelfLogger;
 use Gelf\Publisher;
@@ -56,10 +57,19 @@ class Logger
         if ($this->logDriver === "aws") {
             $this->logGroupName = "$this->serviceName-log-group";
             $this->logStreamName = "$this->serviceName-log-stream";
-            $this->CloudWatchClient = new CloudWatchLogsClient([
+            $config = [
                 'version' => 'latest',
                 'region' => getenv("AWS_REGION") ?: 'eu-central-1',
-            ]);
+            ];
+            if (
+                !empty(getenv('AWS_PROFILE_NAME')) &&
+                (
+                    getenv('ENV') === 'local' || getenv('ENVIRONMENT') === 'local'
+                )
+            ) {
+                $config['credentials'] = CredentialProvider::sso(getenv('AWS_PROFILE_NAME'));
+            }
+            $this->CloudWatchClient = new CloudWatchLogsClient($config);
         } else if ($this->logDriver === "gelf") {
             $this->GelfTransport = new UdpTransport(
                 getenv("GELF_HOST"),
