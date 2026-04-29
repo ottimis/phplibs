@@ -77,14 +77,17 @@ class OGStorage
      *
      * @param string $key The destination path/key in the bucket
      * @param string $filePath Absolute path to the local file
-     * @param string $acl ACL policy (private, public-read, etc.)
+     * @param string|null $acl ACL policy (private, public-read, etc.). Pass null
+     *                         (default) to omit the ACL — required for buckets
+     *                         with object ownership "BucketOwnerEnforced" (the
+     *                         modern AWS default), which reject any ACL.
      * @param string|null $contentType MIME type. Auto-detected if null.
      * @param array $metadata Custom metadata key-value pairs
      */
     public function upload(
         string  $key,
         string  $filePath,
-        string  $acl = 'private',
+        ?string $acl = null,
         ?string $contentType = null,
         array   $metadata = []
     ): OGResponse
@@ -97,8 +100,11 @@ class OGStorage
             'Bucket' => $this->bucket,
             'Key' => $key,
             'SourceFile' => $filePath,
-            'ACL' => $acl,
         ];
+
+        if ($acl !== null) {
+            $params['ACL'] = $acl;
+        }
 
         if ($contentType) {
             $params['ContentType'] = $contentType;
@@ -132,15 +138,16 @@ class OGStorage
      * @param string $key The destination path/key in the bucket
      * @param string $body The file content
      * @param string $contentType MIME type
-     * @param string $acl ACL policy
+     * @param string|null $acl ACL policy. Pass null (default) to omit — required
+     *                         for buckets with object ownership "BucketOwnerEnforced".
      * @param array $metadata Custom metadata key-value pairs
      */
     public function put(
-        string $key,
-        string $body,
-        string $contentType = 'application/octet-stream',
-        string $acl = 'private',
-        array  $metadata = []
+        string  $key,
+        string  $body,
+        string  $contentType = 'application/octet-stream',
+        ?string $acl = null,
+        array   $metadata = []
     ): OGResponse
     {
         $params = [
@@ -148,8 +155,11 @@ class OGStorage
             'Key' => $key,
             'Body' => $body,
             'ContentType' => $contentType,
-            'ACL' => $acl,
         ];
+
+        if ($acl !== null) {
+            $params['ACL'] = $acl;
+        }
 
         if (!empty($metadata)) {
             $params['Metadata'] = $metadata;
@@ -177,13 +187,14 @@ class OGStorage
      * @param string $key The destination path/key in the bucket
      * @param string $base64 Base64-encoded content (with or without data URI prefix)
      * @param string|null $contentType MIME type. Auto-detected from data URI if null.
-     * @param string $acl ACL policy
+     * @param string|null $acl ACL policy. Pass null (default) to omit — required
+     *                         for buckets with object ownership "BucketOwnerEnforced".
      */
     public function putBase64(
         string  $key,
         string  $base64,
         ?string $contentType = null,
-        string  $acl = 'private'
+        ?string $acl = null
     ): OGResponse
     {
         // Handle data URI format: data:image/png;base64,iVBOR...
@@ -332,21 +343,25 @@ class OGStorage
      * @param string $key Object key
      * @param string $contentType Expected content type
      * @param int $expiresIn Seconds until the URL expires (default: 3600)
-     * @param string $acl ACL policy
+     * @param string|null $acl ACL policy. Pass null (default) to omit — required
+     *                         for buckets with object ownership "BucketOwnerEnforced".
      */
     public function getSignedUploadUrl(
-        string $key,
-        string $contentType = 'application/octet-stream',
-        int    $expiresIn = 3600,
-        string $acl = 'private'
+        string  $key,
+        string  $contentType = 'application/octet-stream',
+        int     $expiresIn = 3600,
+        ?string $acl = null
     ): string
     {
-        $cmd = $this->client->getCommand('PutObject', [
+        $params = [
             'Bucket' => $this->bucket,
             'Key' => $key,
             'ContentType' => $contentType,
-            'ACL' => $acl,
-        ]);
+        ];
+        if ($acl !== null) {
+            $params['ACL'] = $acl;
+        }
+        $cmd = $this->client->getCommand('PutObject', $params);
 
         $request = $this->client->createPresignedRequest($cmd, "+{$expiresIn} seconds");
         return (string)$request->getUri();
@@ -382,16 +397,22 @@ class OGStorage
 
     /**
      * Copy an object to a new key within the same bucket.
+     *
+     * @param string|null $acl ACL policy. Pass null (default) to omit — required
+     *                         for buckets with object ownership "BucketOwnerEnforced".
      */
-    public function copy(string $sourceKey, string $destinationKey, string $acl = 'private'): OGResponse
+    public function copy(string $sourceKey, string $destinationKey, ?string $acl = null): OGResponse
     {
+        $params = [
+            'Bucket' => $this->bucket,
+            'CopySource' => $this->bucket . '/' . $sourceKey,
+            'Key' => $destinationKey,
+        ];
+        if ($acl !== null) {
+            $params['ACL'] = $acl;
+        }
         try {
-            $this->client->copyObject([
-                'Bucket' => $this->bucket,
-                'CopySource' => $this->bucket . '/' . $sourceKey,
-                'Key' => $destinationKey,
-                'ACL' => $acl,
-            ]);
+            $this->client->copyObject($params);
 
             return new OGResponse(
                 success: true,

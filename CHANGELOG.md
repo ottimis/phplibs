@@ -1,5 +1,11 @@
 # Changelog
 
+## [5.3.1] - 2026-04-29
+
+### Fixed
+
+- `OGStorage`: l'ACL di default `'private'` causava errore `AccessControlListNotSupported` sui bucket AWS S3 moderni con object ownership `BucketOwnerEnforced` (impostazione di default dal 2023). Ora l'ACL è opzionale (`?string $acl = null`) in `upload()`, `put()`, `putBase64()`, `copy()` e `getSignedUploadUrl()`: se `null` (default) non viene incluso nei parametri della richiesta. Comportamento equivalente a `'private'` per bucket con ACL abilitato (S3 di default rende privati gli oggetti senza ACL esplicito). Chi passava un valore esplicito non è impattato.
+
 ## [5.3.0] - 2026-04-29
 
 ### Added
