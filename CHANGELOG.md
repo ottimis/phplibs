@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.3.0] - 2026-04-29
+
+### Added
+
+- `OGStorage`: nuovo parametro opzionale `cdnUrl` nel costruttore (con fallback all'env var `S3_CDN_URL`) e metodo `getCdnUrl(string $key)` per comporre l'URL CDN di un oggetto. Se il CDN non è configurato, `getCdnUrl()` ritorna l'URL S3 standard.
+- `OGStorage`: i metodi `upload()`, `put()`, `putBase64()` e `copy()` ora includono `cdn_url` nel `data` di `OGResponse`, accanto a `key` e `url`. Permette ai chiamanti di salvare direttamente l'URL pubblico in DB.
+- `OGStorage`: nuovo parametro opzionale `configOverride` nel costruttore, che bypassa la lettura delle env var (`S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, ...) e usa la configurazione passata. Permette di istanziare client multipli verso bucket/cloud diversi nello stesso processo (utile ad esempio per script di migrazione cross-cloud).
+
 ## [5.2.3] - 2026-04-21
 
 ### Added
