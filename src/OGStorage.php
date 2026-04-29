@@ -11,15 +11,33 @@ class OGStorage
 {
     private S3Client $client;
     private string $bucket;
+    private ?string $cdnUrl;
     protected Logger $Logger;
 
-    public function __construct(?string $bucket = null)
+    /**
+     * @param string|null $bucket Bucket name. Defaults to S3_BUCKET env var.
+     * @param string|null $cdnUrl CDN base URL (e.g. https://docs.example.com). Defaults to S3_CDN_URL env var.
+     *                            Used by getCdnUrl() and returned alongside object URL on uploads.
+     * @param array $configOverride Full S3Client config to override env-based defaults. When provided,
+     *                              env vars (S3_REGION, S3_ENDPOINT, S3_ACCESS_KEY, ...) are ignored
+     *                              and only this array (merged with version=latest) is used. Useful for
+     *                              instantiating multiple clients (e.g. cross-cloud sync) in the same process.
+     */
+    public function __construct(?string $bucket = null, ?string $cdnUrl = null, array $configOverride = [])
     {
         $this->Logger = Logger::getInstance();
         $this->bucket = $bucket ?? getenv('S3_BUCKET') ?: '';
 
         if (empty($this->bucket)) {
             throw new RuntimeException("S3 bucket is required. Set S3_BUCKET env or pass it to the constructor.");
+        }
+
+        $this->cdnUrl = $cdnUrl ?? (getenv('S3_CDN_URL') ?: null);
+
+        if (!empty($configOverride)) {
+            $config = array_merge(['version' => 'latest'], $configOverride);
+            $this->client = new S3Client($config);
+            return;
         }
 
         $config = [
@@ -99,6 +117,7 @@ class OGStorage
                 data: [
                     'key' => $key,
                     'url' => $result['ObjectURL'] ?? $this->getUrl($key),
+                    'cdn_url' => $this->getCdnUrl($key),
                 ]
             );
         } catch (\Throwable $e) {
@@ -143,6 +162,7 @@ class OGStorage
                 data: [
                     'key' => $key,
                     'url' => $result['ObjectURL'] ?? $this->getUrl($key),
+                    'cdn_url' => $this->getCdnUrl($key),
                 ]
             );
         } catch (\Throwable $e) {
@@ -277,6 +297,19 @@ class OGStorage
     }
 
     /**
+     * Generate the CDN URL for an object.
+     * Falls back to the S3 object URL when no CDN base is configured
+     * (via S3_CDN_URL env var or constructor argument).
+     */
+    public function getCdnUrl(string $key): string
+    {
+        if (empty($this->cdnUrl)) {
+            return $this->getUrl($key);
+        }
+        return rtrim($this->cdnUrl, '/') . '/' . ltrim($key, '/');
+    }
+
+    /**
      * Generate a pre-signed (temporary) URL for an object.
      *
      * @param string $key Object key
@@ -365,6 +398,7 @@ class OGStorage
                 data: [
                     'key' => $destinationKey,
                     'url' => $this->getUrl($destinationKey),
+                    'cdn_url' => $this->getCdnUrl($destinationKey),
                 ]
             );
         } catch (\Throwable $e) {
