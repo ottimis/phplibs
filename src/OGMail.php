@@ -25,7 +25,7 @@ class OGMail
     private string $mailText;
     private string $mailHtml;
     private array $rcpt = [];
-    private string $replyTo;
+    private array $replyTo = [];
     private array $cc = [];
     private array $bcc = [];
     private array $cids = [];
@@ -63,9 +63,24 @@ class OGMail
         return $this;
     }
 
+    /**
+     * Imposta uno o più indirizzi Reply-To.
+     * Accetta sia una singola email (string) sia un array di email — retrocompatibile col vecchio chiamante.
+     * Sovrascrive l'eventuale lista precedente; per aggiungere usa addReplyTo().
+     */
     public function setReplyTo($email): static
     {
-        $this->replyTo = $email;
+        $this->replyTo = is_array($email) ? array_values($email) : [$email];
+        return $this;
+    }
+
+    /**
+     * Aggiunge un indirizzo Reply-To alla lista esistente.
+     * Coerente con addRcpt/addCc/addBcc.
+     */
+    public function addReplyTo(string $email): static
+    {
+        $this->replyTo[] = $email;
         return $this;
     }
 
@@ -216,8 +231,8 @@ class OGMail
         foreach ($this->rcpt as $rcpt) {
             $mail->addAddress($rcpt);
         }
-        if (!empty($this->replyTo)) {
-            $mail->AddReplyTo($this->replyTo);
+        foreach ($this->replyTo as $rt) {
+            $mail->AddReplyTo($rt);
         }
         foreach ($this->cc as $cc) {
             $mail->addCC($cc);
