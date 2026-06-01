@@ -1,6 +1,6 @@
 {
   "name": "ottimis/phplibs",
-  "version": "5.3.3",
+  "version": "5.4.0",
   "keywords": [
     "release",
     "official",
@@ -22,7 +22,7 @@
     "ext-gd": "*",
     "ext-curl": "*",
     "graylog2/gelf-php": "^2.0",
-    "zircote/swagger-php": "^4.11.1",
+    "zircote/swagger-php": "^6.1.2",
     "smarty/smarty": ">=v5.4.3",
     "ext-mysqli": "*",
     "ext-pdo": "*",
