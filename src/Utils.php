@@ -1150,6 +1150,22 @@ HTML;
     }
 
     /**
+     * Generate the OpenAPI spec by scanning the given sources.
+     *
+     * Wraps swagger-php's Generator so projects have a single, stable entry point.
+     * In swagger-php v6 the static `Generator::scan()` was removed in favour of the
+     * instance method `generate()`: this helper keeps that detail inside the library.
+     *
+     * @param iterable $sources Files/directories to scan (string paths, \SplFileInfo or a Symfony Finder)
+     * @param bool      $validate Whether to validate the resulting spec
+     * @return \OpenApi\Annotations\OpenApi|null
+     */
+    public static function generateOpenApi(iterable $sources, bool $validate = true): ?\OpenApi\Annotations\OpenApi
+    {
+        return (new \OpenApi\Generator())->generate($sources, null, $validate);
+    }
+
+    /**
      * Prevent the instance from being cloned
      */
     private function __clone() {}

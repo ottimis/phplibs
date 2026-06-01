@@ -1,5 +1,18 @@
 # Changelog
 
+## [6.0.0] - 2026-06-01
+
+### Breaking Changes
+
+- **zircote/swagger-php aggiornata da v4 a v6** — In swagger-php v6 il metodo statico `\OpenApi\Generator::scan()` è stato **rimosso** (era deprecato in 5.x). I progetti che generano lo spec OpenAPI (es. endpoint `/docs`) si rompono con `Call to undefined method OpenApi\Generator::scan()`.
+  - **Migrazione**: sostituire `\OpenApi\Generator::scan([...])` con `(new \OpenApi\Generator())->generate([...])` — stesso array di sorgenti, stesso `->toJson()`. In alternativa usare il nuovo helper `Utils::generateOpenApi([...])`.
+  - Eventuali opzioni passate come 2° argomento a `scan()` vanno spostate sui setter del `Generator` (`setVersion()`, `setLogger()`, `setProcessorPipeline()`) o sugli argomenti di `generate($sources, $analysis, $validate)`.
+  - swagger-php v6 richiede PHP ≥ 8.2 (già soddisfatto: phplibs richiede `^8.4`).
+
+### Added
+
+- `Utils::generateOpenApi(iterable $sources, bool $validate = true): ?\OpenApi\Annotations\OpenApi` — helper statico che incapsula la generazione dello spec OpenAPI, offrendo ai progetti un punto d'ingresso stabile rispetto ai futuri cambi d'API di swagger-php.
+
 ## [5.3.1] - 2026-04-29
 
 ### Fixed
