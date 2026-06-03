@@ -115,6 +115,7 @@ class RouteController
                 $record[$propertyName] = $data[$propertyName] ?? null;
                 continue;
             }
+            $resValid = ['value' => null];
             foreach ($validatorAttributes as $attribute) {
                 $validator = $attribute->newInstance();
                 if ($validator->readOnly) {
@@ -127,7 +128,9 @@ class RouteController
                     throw new RuntimeException("There is an error validating '$propertyName': " . $resValid['message']);
                 }
             }
-            if (!$isReadOnly && !empty($resValid['value'])) {
+            // Skip only null (field absent / no default): falsy-but-valid values
+            // like false, 0, "" or [] must still be written to the record.
+            if (!$isReadOnly && $resValid['value'] !== null) {
                 $record[$propertyName] = $resValid['value'];
             }
         }

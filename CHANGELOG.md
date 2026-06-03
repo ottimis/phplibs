@@ -1,5 +1,11 @@
 # Changelog
 
+## [6.0.1] - 2026-06-03
+
+### Fixed
+
+- `RouteController::validateRecord()`: i valori validi ma "falsy" (`false`, `0`, `0.0`, `""`, `"0"`, `[]`) venivano scartati dal record a causa del check `!empty()`, quindi ad esempio un campo booleano impostato a `false` non veniva mai scritto in INSERT/UPDATE. Ora viene saltato solo `null` (campo assente / senza default), mentre tutti gli altri valori validati vengono inclusi.
+
 ## [6.0.0] - 2026-06-01
 
 ### Breaking Changes
