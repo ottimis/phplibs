@@ -783,6 +783,39 @@ class Utils
         ];
     }
 
+    /**
+     * Builds a safe ORDER BY clause from user-supplied paging params (srt/o),
+     * preventing SQL injection via the ORDER BY clause.
+     *
+     * - Direction ($o) is normalized to 'ASC'/'DESC' (case-insensitive); any
+     *   other value defaults to 'DESC'.
+     * - Field ($srt) is validated against a safe identifier pattern
+     *   (column or table.column / alias.column). If it doesn't match, the
+     *   user-derived ORDER BY is dropped and a warning is logged.
+     * - When valid and missing a table prefix, it's auto-prefixed with $from.
+     *
+     * @return string|null The ORDER BY value, or null if the field is unsafe.
+     */
+    private function buildSafeOrderBy(string $srt, string $o, string $from, bool $autoPrefix): ?string
+    {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/', $srt)) {
+            $this->Log->warning(
+                "Tentativo di ordinamento con campo non valido (possibile SQL injection): " . $srt,
+                "PAGING_SRT_INVALID",
+                ["srt" => $srt, "o" => $o]
+            );
+            return null;
+        }
+
+        $direction = strtoupper(trim($o)) === 'ASC' ? 'ASC' : 'DESC';
+
+        if ($autoPrefix && !str_contains($srt, '.')) {
+            $srt = "$from.$srt";
+        }
+
+        return "$srt $direction";
+    }
+
     private function buildPaging($ar, $paging)
     {
         $likeOp = $this->isPgsql() ? 'ILIKE' : 'like';
@@ -817,7 +850,10 @@ class Utils
             }
         }
         if (isset($paging['srt'], $paging['o'])) {
-            $ar["order"] = $paging['srt'] . " " . $paging['o'];
+            $order = $this->buildSafeOrderBy((string) $paging['srt'], (string) $paging['o'], $ar['from'] ?? '', false);
+            if ($order !== null) {
+                $ar["order"] = $order;
+            }
         }
         if (isset($paging['p'], $paging['c'])) {
             $count = $paging['c'] !== "" ? ($paging['c']) : 20;
@@ -871,10 +907,10 @@ class Utils
             }
         }
         if (isset($paging['srt'], $paging['o'])) {
-            if (!str_contains($paging['srt'], '.')) {
-                $paging['srt'] = "{$ar['from']}.$paging[srt]";
+            $order = $this->buildSafeOrderBy((string) $paging['srt'], (string) $paging['o'], $ar['from'] ?? '', true);
+            if ($order !== null) {
+                $ar["order"] = $order;
             }
-            $ar["order"] = $paging['srt'] . " " . $paging['o'];
         }
         if (isset($paging['p'], $paging['c'])) {
             $count = $paging['c'] !== "" ? ($paging['c']) : 20;

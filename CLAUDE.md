@@ -300,9 +300,18 @@ $result = $utils->select($arSql, $paging);
 **How it works**:
 1. `searchableFields` + `s`: Creates `(field1 LIKE '%s%' OR field2 LIKE '%s%')`
 2. `filterableFields` + values: Creates `field = 'value' AND ...`
-3. `srt` + `o`: Sets ORDER BY
+3. `srt` + `o`: Sets ORDER BY (validated, see below)
 4. `p` + `c`: Calculates LIMIT offset
 5. Adds `SQL_CALC_FOUND_ROWS` for total count (unless `noTotal`)
+
+#### ORDER BY Safety (`srt` / `o`) — v6.0.3+
+
+Since `srt`/`o` usually come straight from the HTTP query string, they are validated before being concatenated into the `ORDER BY` clause (SQL injection hardening, applied to both `select()` and `dbSelect()` via the shared `buildSafeOrderBy()` helper):
+
+- **`o` (direction)**: normalized to `ASC`/`DESC` (case-insensitive). Any other value falls back to `DESC`. Payloads like `o = "ASC, (SELECT pg_sleep(5))"` become a plain `DESC`.
+- **`srt` (field)**: validated (on the raw value, before auto-prefix) against `^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$` — i.e. a simple column name or `table.column` / `alias.column`. If it doesn't match (e.g. `id;DROP`, `(SELECT 1)`), **no user-derived `ORDER BY` is applied** and a warning is logged with code `PAGING_SRT_INVALID`. Legitimate values keep working, including the `{from}.srt` auto-prefix of `select()`.
+
+> Note: `searchableFields`/`filterableFields` are unaffected — their field **names** come from developer code, and the corresponding **values** (`s` and filters) are already escaped.
 
 ---
 

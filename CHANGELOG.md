@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.0.2] - 2026-06-10
+
+### Security
+
+- **SQL injection via ORDER BY nei metodi di paginazione di `Utils`** — i parametri di paging `srt` (campo di ordinamento) e `o` (direzione), tipicamente inoltrati dalla query string HTTP, venivano concatenati nella clausola `ORDER BY` senza validazione né escaping. Era sfruttabile da qualunque endpoint paginato che inoltra `srt`/`o` dalla request (estrazione blind/error-based via subquery in ORDER BY).
+  - **Fix**: nuovo helper privato `Utils::buildSafeOrderBy()` usato sia da `buildPaging()` (`dbSelect()`) sia da `buildPagingV2()` (`select()`):
+    - `o` viene normalizzato a `ASC`/`DESC` (case-insensitive); qualsiasi altro valore → `DESC`.
+    - `srt` viene validato (sul valore grezzo) contro il pattern identificatore sicuro `^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$` (colonna o `tabella.colonna`/`alias.colonna`). Se non matcha, l'ORDER BY derivato dall'utente non viene applicato e viene loggato un warning (`PAGING_SRT_INVALID`).
+    - I valori legittimi (nomi colonna semplici e `tabella.colonna`) continuano a funzionare, mantenendo l'auto-prefix `{from}.srt` di `select()`.
+  - Le logiche di `searchableFields`/`filterableFields` non sono toccate (i nomi campo arrivano dal codice sviluppatore, i valori sono già passati con escaping).
+
 ## [6.0.1] - 2026-06-03
 
 ### Fixed
