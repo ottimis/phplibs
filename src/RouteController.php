@@ -141,26 +141,34 @@ class RouteController
     /**
      * @throws Exception
      */
-    protected function get($id, $joinTables = [], $select = null): OGResponse
+    protected function get($id, array $options = []): OGResponse
     {
         $this->checkDbConsistency();
-        $arSql = [
-            "select" => $select ?? [
-                    "*"
-                ],
-            "from" => $this->tableName,
-            "join" => $joinTables,
-            "where" => [
-                [
-                    "field" => "id",
-                    "value" => $id,
-                ],
-                [
-                    "field" => "id_status",
-                    "value" => STATUS::ACTIVE->value,
-                ]
-            ]
+
+        $where = [
+            [
+                "field" => "id",
+                "value" => $id,
+            ],
         ];
+        if (empty($options['withDeleted'])) {
+            $where[] = [
+                "field" => "id_status",
+                "value" => STATUS::ACTIVE->value,
+            ];
+        }
+        if (!empty($options['where'])) {
+            $where = array_merge($where, $options['where']);
+        }
+
+        $arSql = array_merge(
+            ["select" => ["*"]],
+            array_diff_key($options, array_flip(["where", "withDeleted"])),
+            [
+                "from" => $this->tableName,
+                "where" => $where,
+            ],
+        );
 
         $res = $this->Utils->select($arSql);
         if (count($res['data']) === 0) {
@@ -177,21 +185,29 @@ class RouteController
     /**
      * @throws Exception
      */
-    protected function list(array $q): OGResponse
+    protected function list(array $q, array $options = []): OGResponse
     {
         $this->checkDbConsistency();
-        $arSql = [
-            "select" => [
-                "*"
+
+        $where = [];
+        if (empty($options['withDeleted'])) {
+            $where[] = [
+                "field" => "id_status",
+                "value" => STATUS::ACTIVE->value,
+            ];
+        }
+        if (!empty($options['where'])) {
+            $where = array_merge($where, $options['where']);
+        }
+
+        $arSql = array_merge(
+            ["select" => ["*"]],
+            array_diff_key($options, array_flip(["where", "withDeleted"])),
+            [
+                "from" => $this->tableName,
+                "where" => $where,
             ],
-            "from" => $this->tableName,
-            "where" => [
-                [
-                    "field" => "id_status",
-                    "value" => STATUS::ACTIVE->value,
-                ]
-            ]
-        ];
+        );
 
         $res = $this->Utils->select($arSql, $q);
 

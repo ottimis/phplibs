@@ -68,6 +68,7 @@ Database:
 - `DB_DRIVER` — `mysql` (default) or `pgsql`. Controls which adapter `dataBase::getInstance()` returns
 - `DB_DRIVER_{name}` — Per-database driver override for named connections
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`
+- `DB_CHARSET` — charset connessione mysqli (default: `utf8mb4`, v7.0.0+)
 - Multi-db: `DB_HOST_{name}`, `DB_USER_{name}`, etc.
 
 Logging:
@@ -440,7 +441,7 @@ Utils::slimErrorHandler($app, "Errore personalizzato");
 Handles:
 - 404/405 errors → custom HTML page
 - Other exceptions → logs to Logger, returns 500
-- `?debug=1` query param shows exception message
+- `?debug=1` query param shows exception message (solo se `ENVIRONMENT !== "production"`, v7.0.0+)
 
 #### getSwaggerPage() - Swagger UI
 
@@ -776,6 +777,30 @@ public function _deleteUser()  // DELETE /user
 ```
 
 Use `#[Path("/custom/path")]` to override, `#[Methods([Method::GET, Method::POST])]` for multiple methods.
+
+### Helper CRUD: `get()` / `list()` (v7.0.0+)
+
+I due helper protected accettano un array `$options` (prima erano parametri posizionali `joinTables`/`select`):
+
+```php
+// get(mixed $id, array $options = []): OGResponse
+$this->get($id, [
+    "join"   => [["table" => "profiles", "alias" => "p", "on" => ["id_profile"], "fields" => ["name"]]],
+    "select" => ["id", "name"],
+]);
+
+// list(array $q, array $options = []): OGResponse  — $q = paging/search
+$this->list($q, [
+    "leftJoin" => [...],
+    "where"    => [["field" => "category_id", "value" => $catId]],  // appeso ai filtri di base
+]);
+```
+
+- `$options` inoltra a `Utils::select()` tutte le sue chiavi (`select`, `join`/`leftJoin`/`rightJoin`/`innerJoin`, `group`, `order`, `decode`, `map`, `distinct`, `cte`, …).
+- **`where`**: i filtri extra vengono **appesi** al `where` di base — il soft-delete `id_status = ACTIVE` (e in `get()` il match su `id`) resta sempre applicato.
+- **`withDeleted: true`**: salta il filtro `id_status = ACTIVE` (include i record cancellati).
+- `from` e `where` sono forzati dopo il merge: `tableName` non è sovrascrivibile via `$options`.
+- **Migrazione da <7.0.0**: `get($id, $joins, $select)` → `get($id, ["join" => $joins, "select" => $select])`.
 
 ---
 

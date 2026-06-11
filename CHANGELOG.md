@@ -1,5 +1,26 @@
 # Changelog
 
+## [7.0.0] - 2026-06-11
+
+### Security
+
+- **`Utils::slimErrorHandler()` — `?debug=1` non espone più i dettagli dell'eccezione in produzione.** Il messaggio dell'eccezione (che può contenere query SQL fallite, path interni, ecc.) viene mostrato solo se `ENVIRONMENT !== "production"`, coerentemente con il gating già usato da `Logger::api()`. In produzione la risposta è sempre il messaggio generico.
+- **`dataBase` (mysqli) — charset esplicito sulla connessione.** Dopo la connessione viene chiamato `set_charset()` (default `utf8mb4`, configurabile via env `DB_CHARSET`): l'escaping di `real_escape_string` è charset-dependent e senza charset esplicito dipendeva dal default del server (bypass teorico con charset multibyte). Inoltre il fallimento di connessione non usa più `or die(...)` (che stampava l'errore mysqli in output): ora logga il dettaglio via `error_log` e lancia `RuntimeException("Database connection failed")` generica.
+- **`OGMail::sendAWS()` (branch SES) — header/MIME injection.** Il messaggio raw inviato a SES concatenava senza sanitizzazione subject, nome file allegati, Content-ID e Content-Type delle immagini inline: un valore contenente CRLF poteva iniettare header o parti MIME arbitrarie. Ora: il Subject è codificato RFC 2047 (`=?UTF-8?B?...?=`, che neutralizza l'injection e corregge anche i subject con caratteri non-ASCII, prima inviati raw); filename, Content-ID e Content-Type passano dal nuovo helper `sanitizeMimeValue()` (strip CR/LF/NUL), con le doppie virgolette nel filename sostituite da apici. Il branch PHPMailer era già protetto dalla libreria.
+
+### Breaking Changes
+
+- **`RouteController::get()` e `RouteController::list()` — firma cambiata da parametri posizionali a un array `$options`.** Prima `get($id, $joinTables = [], $select = null)` e `list(array $q)`; ora `get($id, array $options = [])` e `list(array $q, array $options = [])`. Le sottoclassi che chiamavano `parent::get($id, $joins, $select)` o passavano join/select posizionali vanno aggiornate.
+  - **Migrazione**:
+    - `get($id, $joins)` → `get($id, ["join" => $joins])`
+    - `get($id, $joins, $select)` → `get($id, ["join" => $joins, "select" => $select])`
+    - `list($q)` resta invariato (il 2° parametro è opzionale).
+  - L'array `$options` viene inoltrato a `Utils::select()` e accetta tutte le sue chiavi (`select`, `join`/`leftJoin`/`rightJoin`/`innerJoin`, `group`, `order`, `decode`, `map`, `distinct`, `cte`, …), eliminando l'accumulo di parametri posizionali.
+  - **Chiavi speciali** gestite dal controller (non passate a `select()` così com'è):
+    - `where` — gli ulteriori filtri vengono **appesi** al `where` di base, così il filtro soft-delete `id_status = ACTIVE` (e in `get()` il match su `id`) resta sempre applicato.
+    - `withDeleted` (bool) — se `true`, salta il filtro di default `id_status = ACTIVE` per includere anche i record cancellati.
+  - `from` e `where` sono forzati dopo il merge: `tableName` resta autorevole e non è sovrascrivibile via `$options`.
+
 ## [6.0.2] - 2026-06-10
 
 ### Security

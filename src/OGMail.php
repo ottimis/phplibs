@@ -278,6 +278,15 @@ class OGMail
     }
 
     /**
+     * Rimuove CR/LF/NUL da un valore destinato a un header o parametro MIME,
+     * per prevenire header injection nel messaggio raw inviato a SES.
+     */
+    private static function sanitizeMimeValue(string $value): string
+    {
+        return str_replace(["\r", "\n", "\0"], '', $value);
+    }
+
+    /**
      * @throws Exception
      */
     public function sendAWS(): OGResponse
@@ -290,7 +299,8 @@ class OGMail
             'MIME-Version: 1.0',
             'Content-Type: ' . $topContentType . '; boundary="' . $boundary . '"',
             'Content-Transfer-Encoding: 7bit',
-            'Subject: ' . $this->mailSubject,
+            // RFC 2047: il base64 neutralizza CRLF injection e gestisce i subject UTF-8
+            'Subject: =?UTF-8?B?' . base64_encode($this->mailSubject) . '?=',
         ];
         $charset = 'UTF-8';
 
@@ -315,12 +325,18 @@ class OGMail
         foreach ($this->cids as $cid)   {
             $image_headers = get_headers($cid->url, true);
             $image_type = $image_headers['Content-Type'];
+            if (is_array($image_type)) {
+                $image_type = end($image_type);
+            }
+            // Content-Type arriva dal server remoto: non fidarsi
+            $image_type = self::sanitizeMimeValue((string) $image_type);
+            $contentId = self::sanitizeMimeValue((string) $cid->cid);
             $image_data = base64_encode(file_get_contents($cid->url));
             $html_body .= <<<EOT
             --{$boundary}
             Content-Type: $image_type;
             Content-Transfer-Encoding: base64
-            Content-ID: <$cid->cid>
+            Content-ID: <$contentId>
             Content-Disposition: inline;
 
             {$image_data}
@@ -330,8 +346,9 @@ class OGMail
 
         foreach ($this->attaches as $attach) {
             $fileData = base64_encode(file_get_contents($attach->path));
-            $mimeType = mime_content_type($attach->path) ?: 'application/octet-stream';
-            $fileName = $attach->name;
+            $mimeType = self::sanitizeMimeValue(mime_content_type($attach->path) ?: 'application/octet-stream');
+            // Oltre a CR/LF, le doppie virgolette romperebbero il quoting di filename="..."
+            $fileName = str_replace('"', "'", self::sanitizeMimeValue($attach->name));
             $html_body .= <<<EOT
             --{$boundary}
             Content-Type: $mimeType; name="$fileName"

@@ -1109,10 +1109,13 @@ class Utils
             error_log(json_encode($logData, JSON_THROW_ON_ERROR), 0);
 
             $response = $app->getResponseFactory()->createResponse();
-            if (empty($logData['QueryParams']['debug'])) {
-                $response->getBody()->write($errorMessage);
-            } else {
+            // ?debug=1 esposto solo fuori da produzione: il messaggio dell'eccezione
+            // può contenere query SQL, path e altri dettagli interni.
+            $debugAllowed = getenv("ENVIRONMENT") !== "production";
+            if ($debugAllowed && !empty($logData['QueryParams']['debug'])) {
                 $response->getBody()->write($exception->getMessage());
+            } else {
+                $response->getBody()->write($errorMessage);
             }
 
             return $response->withStatus(500);

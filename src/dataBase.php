@@ -34,7 +34,19 @@ class dataBase implements DatabaseInterface
             : (getenv('DB_PORT_' . $dbname) !== false ? getenv('DB_PORT_' . $dbname) : 3306);
         $this->port = (int) $portValue;
 
-        $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port) or die("Could not connect " . mysqli_connect_error());
+        try {
+            $this->conn = mysqli_connect($this->host, $this->user, $this->password, $this->database, $this->port);
+        } catch (\mysqli_sql_exception $e) {
+            error_log("Database connection failed ($dbname): " . $e->getMessage());
+            throw new RuntimeException("Database connection failed");
+        }
+        if (!$this->conn) {
+            error_log("Database connection failed ($dbname): " . mysqli_connect_error());
+            throw new RuntimeException("Database connection failed");
+        }
+        // Charset esplicito: l'escaping di real_escape_string dipende dal charset
+        // della connessione; senza set_charset si usa il default del server.
+        $this->conn->set_charset(getenv('DB_CHARSET') ?: 'utf8mb4');
         if (getenv("SQL_MODE_LEGACY") === "true") {
             $this->query("SET sql_mode = '';");
         } elseif (getenv("SQL_MODE") !== false) {
