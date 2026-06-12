@@ -343,10 +343,16 @@ class RouteController
         // Middleware CORS
         $app->add(function ($request, $handler) {
             $response = $handler->handle($request);
-            return $response
+            $response = $response
                 ->withHeader('Access-Control-Allow-Origin', '*')
                 ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
                 ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+            // Max-Age ha senso solo sulla preflight: permette al browser di
+            // cachearla ed evitare una OPTIONS per ogni richiesta
+            if ($request->getMethod() === 'OPTIONS') {
+                $response = $response->withHeader('Access-Control-Max-Age', '86400');
+            }
+            return $response;
         });
 
         // Middleware per il trailing slash

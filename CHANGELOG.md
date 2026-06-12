@@ -1,5 +1,16 @@
 # Changelog
 
+## [7.0.1] - 2026-06-12
+
+### Added
+
+- `RouteController::addGlobalMiddlewares()`: il middleware CORS ora aggiunge `Access-Control-Max-Age: 86400` alle risposte delle richieste preflight (`OPTIONS`), permettendo al browser di cachearne l'esito per 24h invece di ripetere una OPTIONS per ogni chiamata API (le raffiche di preflight saturavano i worker php-fpm).
+
+### Fixed
+
+- `Utils::buildSql()`: nel caso `join`/`leftJoin`/`rightJoin`/`innerJoin` la clausola ON veniva prefissata con `$ar['from']` (l'array di output in costruzione) invece di `$req['from']` (l'input). Se nelle chiavi dell'array richiesta i join precedevano `from` — l'ordine prodotto da `RouteController::get()`/`list()` con le `$options` v7.0.0 — si otteneva `Undefined array key "from"` e una ON malformata (prefisso vuoto). Ora il prefisso usa sempre `$req['from']`, indipendentemente dall'ordine delle chiavi.
+- `Utils::buildSql()`: stessa classe di bug per i `fields` dei join — venivano appesi al SELECT durante l'elaborazione del join solo se la chiave `select` era già stata processata; con i join prima di `select` nell'array richiesta venivano **scartati in silenzio**. Ora i fields sono accumulati e appesi al SELECT a fine costruzione, indipendentemente dall'ordine delle chiavi (l'ordine dei campi nell'output resta quello dei join).
+
 ## [7.0.0] - 2026-06-11
 
 ### Security

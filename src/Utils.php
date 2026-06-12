@@ -315,6 +315,9 @@ class Utils
     {
         $db = $this->dataBase;
         $ar = array();
+        // I "fields" dei join vengono accumulati qui e appesi al select a fine
+        // loop, così il risultato non dipende dall'ordine delle chiavi di $req
+        $joinFields = [];
         foreach ($req as $key => $value) {
             if (isset($value)) {
                 switch ($key) {
@@ -397,18 +400,20 @@ class Utils
                             $destinationField = $onArray[1] ?? 'id';
                             $table = $v['table'] . (isset($v['alias']) ? " " . $v['alias'] : "");
                             $alias = $v['alias'] ?? $v['table'];
+                            // $req['from'], non $ar['from']: l'ordine delle chiavi in $req non è
+                            // garantito (con le options v7 i join possono precedere "from")
                             $onClause = sprintf("%s=%s",
-                                (!str_contains($fromField, ".") && !str_contains($fromField, "(")) ? "{$ar['from']}.{$fromField}" : $fromField,
+                                (!str_contains($fromField, ".") && !str_contains($fromField, "(")) ? "{$req['from']}.{$fromField}" : $fromField,
                                 "{$alias}.$destinationField");
                             // on[2]: condizione aggiuntiva sulla clausola ON (es. "lang = 'en'")
                             if (!empty($onArray[2])) {
                                 $onClause .= " AND " . (str_contains($onArray[2], '.') ? $onArray[2] : "{$alias}.{$onArray[2]}");
                             }
                             $ar[$key] .= sprintf("%s %s ON %s ", $joinType, $table, $onClause);
-                            if (!empty($ar['select']) && !empty($v['fields']))  {
-                                $ar['select'] .= ", ".implode(", ", array_map(static function ($f) use ($v, $alias) {
-                                        return "{$alias}.{$f}";
-                                    }, $v['fields']));
+                            if (!empty($v['fields']))  {
+                                foreach ($v['fields'] as $f) {
+                                    $joinFields[] = "{$alias}.{$f}";
+                                }
                             }
                         }
                         break;
@@ -438,6 +443,9 @@ class Utils
                         break;
                 }
             }
+        }
+        if (!empty($joinFields) && !empty($ar['select'])) {
+            $ar['select'] .= ", " . implode(", ", $joinFields);
         }
         return $ar;
     }
