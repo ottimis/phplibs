@@ -75,6 +75,12 @@ Logging:
 - `LOG_DRIVER` (db, logstash, aws, gelf, gelf-tcp, local)
 - `LOG_SERVICE_NAME`, `GELF_HOST`, `GELF_PORT`
 
+CORS (`RouteController::addGlobalMiddlewares()`, v7.0.1+) — tutte opzionali, default = comportamento storico aperto:
+- `CORS_ALLOW_ORIGIN` (default `*`) — origin singola o allowlist separata da virgola (con echo dell'`Origin` in lista + `Vary: Origin`)
+- `CORS_ALLOW_HEADERS`, `CORS_ALLOW_METHODS` — override degli header ammessi (default sensati)
+- `CORS_MAX_AGE` (default `86400`) — cache della preflight lato browser
+- `CORS_ALLOW_CREDENTIALS` (`true` per attivare; emesso solo se origin ≠ `*`)
+
 ---
 
 ## Utils Class (Complete Reference)

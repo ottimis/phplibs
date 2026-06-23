@@ -1,10 +1,16 @@
 # Changelog
 
-## [7.0.1] - 2026-06-12
+## [7.1.0] - 2026-06-12
 
 ### Added
 
-- `RouteController::addGlobalMiddlewares()`: il middleware CORS ora aggiunge `Access-Control-Max-Age: 86400` alle risposte delle richieste preflight (`OPTIONS`), permettendo al browser di cachearne l'esito per 24h invece di ripetere una OPTIONS per ogni chiamata API (le raffiche di preflight saturavano i worker php-fpm).
+- `RouteController::addGlobalMiddlewares()`: il middleware CORS ora aggiunge `Access-Control-Max-Age` alle risposte delle richieste preflight (`OPTIONS`), permettendo al browser di cachearne l'esito invece di ripetere una OPTIONS per ogni chiamata API (le raffiche di preflight saturavano i worker php-fpm).
+- `RouteController::addGlobalMiddlewares()`: header CORS ora configurabili via env (default = comportamento storico, retrocompatibile):
+  - `CORS_ALLOW_ORIGIN` (default `*`) — origin singola, oppure allowlist separata da virgola (`https://a.com, https://b.com`): in tal caso si risponde con l'`Origin` della richiesta se presente in lista (altrimenti la prima della lista) e si aggiunge `Vary: Origin`.
+  - `CORS_ALLOW_HEADERS` (default `X-Requested-With, Content-Type, Accept, Origin, Authorization`).
+  - `CORS_ALLOW_METHODS` (default `GET, POST, PUT, PATCH, DELETE, OPTIONS`).
+  - `CORS_MAX_AGE` (default `86400`).
+  - `CORS_ALLOW_CREDENTIALS` (default disattivo): se `true` emette `Access-Control-Allow-Credentials: true`, ma solo quando l'origin risolta non è `*` (incompatibilità da spec CORS).
 
 ### Fixed
 

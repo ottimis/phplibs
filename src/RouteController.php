@@ -340,17 +340,45 @@ class RouteController
     // Aggiunge i middleware globali (CORS, trailing slash, preflight OPTIONS)
     public static function addGlobalMiddlewares(App $app): void
     {
-        // Middleware CORS
-        $app->add(function ($request, $handler) {
+        // Middleware CORS — configurabile via env, default = comportamento storico (* aperto)
+        $allowOrigin  = getenv('CORS_ALLOW_ORIGIN') ?: '*';
+        $allowHeaders = getenv('CORS_ALLOW_HEADERS') ?: 'X-Requested-With, Content-Type, Accept, Origin, Authorization';
+        $allowMethods = getenv('CORS_ALLOW_METHODS') ?: 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+        $maxAge       = getenv('CORS_MAX_AGE') ?: '86400';
+        $allowCreds   = getenv('CORS_ALLOW_CREDENTIALS') === 'true';
+        // Allowlist multipla: "https://a.com, https://b.com" → si risponde con l'Origin
+        // della richiesta solo se presente in lista (necessario per Allow-Credentials)
+        $originList = ($allowOrigin !== '*' && str_contains($allowOrigin, ','))
+            ? array_map('trim', explode(',', $allowOrigin))
+            : null;
+
+        $app->add(function ($request, $handler) use ($allowOrigin, $allowHeaders, $allowMethods, $maxAge, $allowCreds, $originList) {
             $response = $handler->handle($request);
+
+            $resolvedOrigin = $allowOrigin;
+            $varyOrigin = false;
+            if ($originList !== null) {
+                $requestOrigin = $request->getHeaderLine('Origin');
+                $resolvedOrigin = in_array($requestOrigin, $originList, true) ? $requestOrigin : $originList[0];
+                $varyOrigin = true; // la risposta dipende dall'Origin: evita cache cross-origin errata
+            }
+
             $response = $response
-                ->withHeader('Access-Control-Allow-Origin', '*')
-                ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
-                ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+                ->withHeader('Access-Control-Allow-Origin', $resolvedOrigin)
+                ->withHeader('Access-Control-Allow-Headers', $allowHeaders)
+                ->withHeader('Access-Control-Allow-Methods', $allowMethods);
+
+            if ($varyOrigin) {
+                $response = $response->withHeader('Vary', 'Origin');
+            }
+            // Allow-Credentials è incompatibile con origin "*" (spec CORS): emesso solo con origin specifica
+            if ($allowCreds && $resolvedOrigin !== '*') {
+                $response = $response->withHeader('Access-Control-Allow-Credentials', 'true');
+            }
             // Max-Age ha senso solo sulla preflight: permette al browser di
             // cachearla ed evitare una OPTIONS per ogni richiesta
             if ($request->getMethod() === 'OPTIONS') {
-                $response = $response->withHeader('Access-Control-Max-Age', '86400');
+                $response = $response->withHeader('Access-Control-Max-Age', $maxAge);
             }
             return $response;
         });
