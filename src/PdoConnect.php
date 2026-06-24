@@ -28,10 +28,26 @@ class PdoConnect
         $this->database = ($db !== '') ? getenv('DB_NAME_' . $db) : getenv('DB_NAME');
         $this->port = ($db !== '') ? getenv('DB_PORT_' . $db) : getenv('DB_PORT');
 
-        $this->conn = new PDO("sqlsrv:Server=$this->host,$this->port;Database=$this->database;TrustServerCertificate=true", "$this->user", "$this->password");
-        $this->conn->setAttribute(PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
-        if ($error) {
-            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        try {
+            $this->conn = new PDO("sqlsrv:Server=$this->host,$this->port;Database=$this->database;TrustServerCertificate=true", "$this->user", "$this->password");
+            $this->conn->setAttribute(PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
+            if ($error) {
+                $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            }
+        } catch (PDOException $e) {
+            // Log dell'errore reale sul driver configurato (non in output)
+            try {
+                Logger::getInstance()->error('Errore connessione DB: ' . $e->getMessage(), 'PDOCONN', [], $e);
+            } catch (\Throwable $ignore) {
+                error_log('Errore connessione DB: ' . $e->getMessage());
+            }
+
+            // In produzione non esponiamo DSN/credenziali/dettagli: messaggio generico
+            $isProduction = getenv('ENVIRONMENT') === 'production' || getenv('ENV') === 'production';
+            if ($isProduction) {
+                throw new PDOException('Errore di connessione al database', (int) $e->getCode());
+            }
+            throw $e;
         }
         $this->debug = $error;
     }

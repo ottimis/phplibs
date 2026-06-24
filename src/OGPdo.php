@@ -33,10 +33,27 @@ class OGPdo
         $this->dbEngine = $engine;
 
         $connectionString = $this->buildConnectionString($engine);
-        $this->conn = new PDO($connectionString, $this->user, $this->password);
 
-        if ($engine === DBEngine::SQLSRV) {
-            $this->conn->setAttribute(PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
+        try {
+            $this->conn = new PDO($connectionString, $this->user, $this->password);
+
+            if ($engine === DBEngine::SQLSRV) {
+                $this->conn->setAttribute(PDO::SQLSRV_ATTR_FETCHES_NUMERIC_TYPE, true);
+            }
+        } catch (PDOException $e) {
+            // Log dell'errore reale sul driver configurato (non in output)
+            try {
+                Logger::getInstance()->error('Errore connessione DB: ' . $e->getMessage(), 'PDOCONN', [], $e);
+            } catch (\Throwable $ignore) {
+                error_log('Errore connessione DB: ' . $e->getMessage());
+            }
+
+            // In produzione non esponiamo DSN/credenziali/dettagli: messaggio generico
+            $isProduction = getenv('ENVIRONMENT') === 'production' || getenv('ENV') === 'production';
+            if ($isProduction) {
+                throw new PDOException('Errore di connessione al database', (int) $e->getCode());
+            }
+            throw $e;
         }
         $this->debug = false;
     }

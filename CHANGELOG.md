@@ -1,5 +1,14 @@
 # Changelog
 
+## [7.1.1] - 2026-06-24
+
+### Security
+
+- **`PdoConnect` e `OGPdo` — l'errore di connessione al DB non espone più i dettagli in produzione.** Il `new PDO(...)` nel costruttore non era protetto: una `PDOException` non gestita propagava il messaggio (DSN con host/porta/database, dettagli del driver) fino alla response, esponendolo in produzione. Ora la connessione è in `try/catch (PDOException)`:
+  - l'errore **reale completo** viene loggato via `Logger::error()` (driver configurato + Sentry; fallback `error_log` se il Logger fallisce) → resta visibile nei log del container per il debug;
+  - in produzione (`ENVIRONMENT=production` o `ENV=production`) al client viene rilanciata una `PDOException` generica (`"Errore di connessione al database"`), senza dettagli;
+  - in locale/staging l'eccezione originale viene rilanciata invariata.
+
 ## [7.1.0] - 2026-06-12
 
 ### Added
