@@ -9,6 +9,7 @@ class OGCache
     private static array $instances = [];
     private \Redis $redis;
     private string $prefix;
+    private ?self $rawInstance = null;
 
     public function __construct(string $prefix = '', string $connectionName = 'default')
     {
@@ -60,6 +61,34 @@ class OGCache
     public static function createNew(string $prefix = '', string $connectionName = 'default'): self
     {
         return new self($prefix, $connectionName);
+    }
+
+    /**
+     * Get a sibling cache that operates on raw, non-prefixed keys.
+     *
+     * Returns a lightweight clone sharing the same Redis connection but with
+     * an empty prefix, so every method (get/set/has/delete/clear/remember/...)
+     * works on the exact key passed. Useful for reading/writing global keys
+     * shared with other apps on the same Redis.
+     *
+     * Example: $cache->raw()->get('global:feature_flag')
+     *
+     * Calling raw() on an already-unprefixed instance returns itself.
+     */
+    public function raw(): self
+    {
+        if ($this->prefix === '') {
+            return $this;
+        }
+
+        if ($this->rawInstance === null) {
+            $clone = clone $this;
+            $clone->prefix = '';
+            $clone->rawInstance = null;
+            $this->rawInstance = $clone;
+        }
+
+        return $this->rawInstance;
     }
 
     /**

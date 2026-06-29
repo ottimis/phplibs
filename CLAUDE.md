@@ -943,8 +943,24 @@ $cache->increment('key', $by);              // int
 $cache->decrement('key', $by);              // int
 $cache->expire('key', $ttl);               // bool
 $cache->ttl('key');                          // int (-1 no scadenza, -2 non esiste)
+$cache->raw();                               // OGCache con prefix vuoto (chiavi globali)
 $cache->getRedis();                          // \Redis instance
 ```
+
+### Chiavi non prefissate: `raw()`
+
+Di default ogni metodo antepone il prefix dell'istanza. `raw()` restituisce un clone leggero (stessa connessione Redis, prefix vuoto) per operare su chiavi esatte/globali — utile per chiavi condivise con altre app sullo stesso Redis. Tutti i metodi (`get`/`set`/`has`/`delete`/`clear`/`remember`/`increment`/`ttl`/...) funzionano sulla chiave così com'è.
+
+```php
+$cache = OGCache::getInstance("myapp");   // prefix "myapp:"
+
+$cache->set('flag', 1, 60);               // chiave reale: myapp:flag
+$cache->raw()->set('global:flag', 1, 60); // chiave reale: global:flag
+$v = $cache->raw()->get('global:flag');
+$cache->raw()->delete('global:flag');
+```
+
+> Il clone è memoizzato e condivide la connessione: `raw()` non apre una nuova connessione Redis. Chiamare `raw()` su un'istanza già senza prefix ritorna se stessa.
 
 ### ⚠️ Requisito: ext-redis
 
