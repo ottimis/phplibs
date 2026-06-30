@@ -774,6 +774,27 @@ try {
 
 ## Route Mapping Convention
 
+### Response JSON: `json()` (v7.3.0+)
+
+**Usare SEMPRE `$this->json()` per scrivere le response — MAI `json_encode(..., JSON_NUMERIC_CHECK)`** (quel flag perde gli zeri iniziali dei codici: partita IVA `"01234567890"` → `1234567890`, CAP `"00100"`, `code`, `id_ext`, `zip`, in modo permanente).
+
+```php
+// json(ResponseInterface $response, mixed $data, int $status = 200): ResponseInterface
+public function _getId(Request $request, Response $response, array $args): Response
+{
+    $res = $this->get($args['id']);
+    return $this->json($response, $res, 200); // body + Content-Type: application/json + status
+}
+```
+
+- Conversione stringa→numero **value-based** (mai sulle chiavi) e **lossless**, ricorsiva su array annidati:
+  - `int` solo se matcha `^-?(0|[1-9]\d*)$` **e** round-trip esatto (`(string)(int)$v === $v`) → niente zeri iniziali, niente interi fuori dal range PHP;
+  - `float` solo se matcha `^-?(0|[1-9]\d*)\.\d+$`;
+  - altrimenti resta **stringa**. Quindi `"01234567890"`, `"00100"`, `"0"` e i big-int fuori range restano intatti; `id`/prezzi/percentuali diventano numeri.
+- Niente whitelist di chiavi (protezione puramente sul valore). Serializza con `JSON_THROW_ON_ERROR`.
+
+### Controller method naming
+
 Controller methods follow this pattern:
 ```php
 public function _getUsers()    // GET /users

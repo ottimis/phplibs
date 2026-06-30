@@ -8,6 +8,7 @@ use ottimis\phplibs\Middlewares\ValidationMiddleware;
 use ottimis\phplibs\schemas\Base\OGResponse;
 use ottimis\phplibs\schemas\STATUS;
 use ottimis\phplibs\schemas\UPSERT_MODE;
+use Psr\Http\Message\ResponseInterface;
 use ReflectionClass;
 use ReflectionException;
 use RuntimeException;
@@ -70,6 +71,79 @@ class RouteController
         if ($dbName !== false) {
             $this->Utils = new Utils($dbName);
         }
+    }
+
+    /**
+     * Scrive $data come JSON nel body della response, impostando Content-Type
+     * e status, e la ritorna.
+     *
+     * Da usare SEMPRE al posto di json_encode(..., JSON_NUMERIC_CHECK): quel
+     * flag è globale e cieco — converte OGNI stringa numerica in numero,
+     * corrompendo in modo permanente i campi-codice con zeri iniziali (partita
+     * IVA "01234567890" → 1234567890, CAP "00100", id_ext, ecc.).
+     *
+     * Qui la conversione stringa→numero è value-based e LOSSLESS: una stringa
+     * diventa numero SOLO se la sua forma è canonica e il round-trip è esatto
+     * (vedi numerify()). Niente whitelist di chiavi.
+     *
+     * @throws \JsonException
+     */
+    protected function json(ResponseInterface $response, mixed $data, int $status = 200): ResponseInterface
+    {
+        $json = json_encode(self::numerify($data), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $response->getBody()->write($json);
+
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus($status);
+    }
+
+    /**
+     * Conversione numerica LOSSLESS, ricorsiva e value-based.
+     *
+     * - Tocca solo i VALORI, mai le chiavi (le chiavi numeriche-stringa di un
+     *   array associativo restano invariate).
+     * - Una stringa diventa:
+     *     int   se matcha ^-?(0|[1-9]\d*)$ E il round-trip è esatto
+     *           ((string)(int)$v === $v): esclude zeri iniziali ("00100"),
+     *           "-0", e interi fuori dal range PHP (che resterebbero stringa);
+     *     float se matcha ^-?(0|[1-9]\d*)\.\d+$ (un solo punto, decimali
+     *           presenti, niente zeri iniziali sulla parte intera).
+     *   In ogni altro caso la stringa resta STRINGA — così "01234567890",
+     *   "00100", "0", "1e3", " 5" restano intatte.
+     * - Gli altri tipi (int, float, bool, null, ecc.) passano invariati.
+     */
+    private static function numerify(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[$k] = self::numerify($v); // chiave $k mai toccata
+            }
+            return $out;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        // int canonico con round-trip esatto: esclude zeri iniziali e overflow.
+        // Il bare "0" è trattato come codice (coerente con gli altri codici a
+        // zeri iniziali) e lasciato stringa per contratto della libreria.
+        if ($value !== "0" && preg_match('/^-?(0|[1-9]\d*)$/', $value) === 1) {
+            $asInt = (int) $value;
+            if ((string) $asInt === $value) {
+                return $asInt;
+            }
+            return $value; // fuori range PHP: resta stringa per non perdere cifre
+        }
+
+        // float canonico: parte intera senza zeri iniziali + decimali obbligatori
+        if (preg_match('/^-?(0|[1-9]\d*)\.\d+$/', $value) === 1) {
+            return (float) $value;
+        }
+
+        return $value;
     }
 
     /**

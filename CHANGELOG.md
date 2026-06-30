@@ -1,5 +1,14 @@
 # Changelog
 
+## [7.3.0] - 2026-06-30
+
+### Added
+
+- **`RouteController::json()` — helper per response JSON con conversione numerica LOSSLESS.** Le route serializzavano spesso le response con `json_encode(..., JSON_NUMERIC_CHECK)`: il flag è globale e cieco, converte **ogni** stringa numerica in numero e corrompe in modo permanente i campi-codice con zeri iniziali (partita IVA `"01234567890"` → `1234567890`, CAP `"00100"`, `code`, `id_ext`, `zip`). Il nuovo metodo `protected function json(ResponseInterface $response, mixed $data, int $status = 200): ResponseInterface` scrive il body, imposta `Content-Type: application/json` e lo status, e ritorna la response.
+  - La conversione stringa→numero è **value-based** (mai sulle chiavi) e **lossless**, applicata ricorsivamente: una stringa diventa `int` solo se matcha `^-?(0|[1-9]\d*)$` **e** il round-trip è esatto (`(string)(int)$v === $v`, quindi niente zeri iniziali né overflow oltre il range PHP), `float` solo se matcha `^-?(0|[1-9]\d*)\.\d+$`; in ogni altro caso resta **stringa**. Così `"01234567890"`, `"00100"`, `"0"` e gli interi fuori range restano intatti, mentre `id`/prezzi/percentuali diventano numeri.
+  - Niente whitelist di chiavi: la protezione è puramente sul valore. Serializzazione con `JSON_THROW_ON_ERROR`.
+  - **Additivo e retrocompatibile**: le route esistenti continuano a funzionare; adottare `$this->json()` al posto di `json_encode(..., JSON_NUMERIC_CHECK)`.
+
 ## [7.1.1] - 2026-06-24
 
 ### Security
