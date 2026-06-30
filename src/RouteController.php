@@ -128,9 +128,10 @@ class RouteController
         }
 
         // int canonico con round-trip esatto: esclude zeri iniziali e overflow.
-        // Il bare "0" è trattato come codice (coerente con gli altri codici a
-        // zeri iniziali) e lasciato stringa per contratto della libreria.
-        if ($value !== "0" && preg_match('/^-?(0|[1-9]\d*)$/', $value) === 1) {
+        // Il bare "0" diventa int 0 (lossless): dal DB i flag/contatori numerici
+        // arrivano come stringa e tenere "0" stringa romperebbe l'asimmetria con
+        // gli altri interi (es. id_status "1" numero vs "0" stringa).
+        if (preg_match('/^-?(0|[1-9]\d*)$/', $value) === 1) {
             $asInt = (int) $value;
             if ((string) $asInt === $value) {
                 return $asInt;

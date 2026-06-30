@@ -790,7 +790,7 @@ public function _getId(Request $request, Response $response, array $args): Respo
 - Conversione stringa→numero **value-based** (mai sulle chiavi) e **lossless**, ricorsiva su array annidati:
   - `int` solo se matcha `^-?(0|[1-9]\d*)$` **e** round-trip esatto (`(string)(int)$v === $v`) → niente zeri iniziali, niente interi fuori dal range PHP;
   - `float` solo se matcha `^-?(0|[1-9]\d*)\.\d+$`;
-  - altrimenti resta **stringa**. Quindi `"01234567890"`, `"00100"`, `"0"` e i big-int fuori range restano intatti; `id`/prezzi/percentuali diventano numeri.
+  - altrimenti resta **stringa**. Quindi `"01234567890"`, `"00100"` e i big-int fuori range restano intatti; `id`/prezzi/percentuali diventano numeri. Il bare `"0"` diventa `0` (int): è quasi sempre un flag/contatore (`id_status`, conteggi) e la conversione è lossless.
 - Niente whitelist di chiavi (protezione puramente sul valore). Serializza con `JSON_THROW_ON_ERROR`.
 
 ### Controller method naming

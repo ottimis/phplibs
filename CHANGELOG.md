@@ -1,5 +1,11 @@
 # Changelog
 
+## [7.3.1] - 2026-06-30
+
+### Changed
+
+- **`RouteController::json()` — il bare `"0"` ora diventa l'intero `0`** (prima era lasciato stringa). Dai progetti i valori arrivano dal DB (mysqli) come stringhe e `"0"` è quasi sempre un flag/contatore numerico (`id_status`, conteggi): tenerlo stringa creava l'asimmetria `id_status: 1` (numero) vs `id_status: 0` (stringa) che rompe i confronti `=== 0` lato frontend. La conversione resta lossless (nessuna cifra persa). Gli altri casi sono invariati: `"00100"`/`"01234567890"`/`"-0"` restano stringa, gli interi fuori dal range PHP restano stringa.
+
 ## [7.3.0] - 2026-06-30
 
 ### Added

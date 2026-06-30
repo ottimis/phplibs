@@ -42,7 +42,7 @@ $assert = static function (string $label, mixed $got, mixed $expected) use (&$fa
 // ---- Codes with leading zeros: MUST stay strings ----
 $assert("partita IVA 01234567890",            $call("01234567890"), "01234567890");
 $assert("CAP 00100",                          $call("00100"),       "00100");
-$assert("single zero '0'",                    $call("0"),           "0");
+$assert("single zero '0' -> int 0",           $call("0"),           0);
 $assert("zip '08234'",                        $call("08234"),       "08234");
 $assert("'-0' stays string",                  $call("-0"),          "-0");
 
