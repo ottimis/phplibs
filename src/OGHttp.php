@@ -46,7 +46,6 @@ class OGHttp
 
         $resp = curl_exec($curl);
         $statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
         return array(
             "body" => $resp,
             "statusCode" => $statusCode,
@@ -83,7 +82,6 @@ class OGHttp
 
         $resp = curl_exec($curl);
         $statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
         return array(
             "body" => $resp,
             "statusCode" => $statusCode,
@@ -113,7 +111,6 @@ class OGHttp
 
         $resp = curl_exec($curl);
         $statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        curl_close($curl);
         return array(
             "body" => $resp,
             "statusCode" => $statusCode,
