@@ -627,7 +627,6 @@ class Utils
     }
 
     /**
-     * @throws JsonException
      * @throws Exception
      */
     public function select($req, $paging = array(), $sqlOnly = false): array|string
@@ -755,7 +754,14 @@ class Utils
                 if (isset($req['decode'])) {
                     foreach ($req['decode'] as $value) {
                         if (!empty($rec[$value])) {
-                            $rec[$value] = json_decode($rec[$value], true, 512, JSON_THROW_ON_ERROR);
+                            try {
+                                $rec[$value] = json_decode($rec[$value], true, 512, JSON_THROW_ON_ERROR);
+                            } catch (JsonException $e) {
+                                // JSON malformato in colonna marcata 'decode': errore di dato
+                                // non recuperabile → RuntimeException (unchecked), così i chiamanti
+                                // di select() non ereditano una checked JsonException.
+                                throw new RuntimeException("select(): decode del campo '$value' fallito: " . $e->getMessage(), 0, $e);
+                            }
                         }
                     }
                 }

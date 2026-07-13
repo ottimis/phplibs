@@ -86,11 +86,18 @@ class RouteController
      * diventa numero SOLO se la sua forma è canonica e il round-trip è esatto
      * (vedi numerify()). Niente whitelist di chiavi.
      *
-     * @throws \JsonException
+     * Un fallimento di serializzazione (UTF-8 malformato, ricorsione, risorse)
+     * è un errore non recuperabile del payload: viene rilanciato come
+     * RuntimeException (unchecked) così i controller non devono dichiarare/gestire
+     * una checked \JsonException — se ne occupa lo slimErrorHandler → 500.
      */
     protected function json(ResponseInterface $response, mixed $data, int $status = 200): ResponseInterface
     {
-        $json = json_encode(self::numerify($data), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        try {
+            $json = json_encode(self::numerify($data), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (\JsonException $e) {
+            throw new \RuntimeException('Serializzazione JSON della response fallita: ' . $e->getMessage(), 0, $e);
+        }
         $response->getBody()->write($json);
 
         return $response
