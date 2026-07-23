@@ -42,7 +42,6 @@ class Notify
     curl_setopt($ch, CURLOPT_TIMEOUT, 2);
     $server_output = curl_exec($ch);
     $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     return array(
       "body" => $server_output,

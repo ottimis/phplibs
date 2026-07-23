@@ -448,7 +448,6 @@ class Logger
             $error_msg = curl_error($curl);
             Notify::notify("Logstash error", array("note" => $error_msg));
         }
-        curl_close($curl);
     }
 
     /**
