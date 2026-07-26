@@ -429,8 +429,10 @@ class RouteController
         $maxAge       = getenv('CORS_MAX_AGE') ?: '86400';
         $allowCreds   = getenv('CORS_ALLOW_CREDENTIALS') === 'true';
         // Allowlist multipla: "https://a.com, https://b.com" → si risponde con l'Origin
-        // della richiesta solo se presente in lista (necessario per Allow-Credentials)
-        $originList = ($allowOrigin !== '*' && str_contains($allowOrigin, ','))
+        // della richiesta solo se presente in lista (necessario per Allow-Credentials).
+        // Le voci possono contenere wildcard ("https://*.example.com"): attivano il
+        // match a pattern anche con una sola voce.
+        $originList = ($allowOrigin !== '*' && (str_contains($allowOrigin, ',') || str_contains($allowOrigin, '*')))
             ? array_map('trim', explode(',', $allowOrigin))
             : null;
 
@@ -441,12 +443,39 @@ class RouteController
             $varyOrigin = false;
             if ($originList !== null) {
                 $requestOrigin = $request->getHeaderLine('Origin');
-                $resolvedOrigin = in_array($requestOrigin, $originList, true) ? $requestOrigin : $originList[0];
                 $varyOrigin = true; // la risposta dipende dall'Origin: evita cache cross-origin errata
+                $resolvedOrigin = null;
+                foreach ($originList as $allowed) {
+                    if (str_contains($allowed, '*')) {
+                        // Wildcard → regex ancorata: il suffisso resta letterale, quindi
+                        // "https://*.example.com" non può matchare host esterni al dominio
+                        $pattern = '#^' . str_replace('\*', '.+', preg_quote($allowed, '#')) . '$#i';
+                        if ($requestOrigin !== '' && preg_match($pattern, $requestOrigin)) {
+                            $resolvedOrigin = $requestOrigin;
+                            break;
+                        }
+                    } elseif ($requestOrigin === $allowed) {
+                        $resolvedOrigin = $requestOrigin;
+                        break;
+                    }
+                }
+                if ($resolvedOrigin === null) {
+                    // Nessun match: fallback storico sulla prima voce letterale; se la
+                    // lista è fatta solo di pattern non si emette alcun Allow-Origin
+                    // (un pattern nell'header sarebbe invalido per la spec CORS)
+                    foreach ($originList as $allowed) {
+                        if (!str_contains($allowed, '*')) {
+                            $resolvedOrigin = $allowed;
+                            break;
+                        }
+                    }
+                }
             }
 
+            if ($resolvedOrigin !== null) {
+                $response = $response->withHeader('Access-Control-Allow-Origin', $resolvedOrigin);
+            }
             $response = $response
-                ->withHeader('Access-Control-Allow-Origin', $resolvedOrigin)
                 ->withHeader('Access-Control-Allow-Headers', $allowHeaders)
                 ->withHeader('Access-Control-Allow-Methods', $allowMethods);
 
@@ -454,7 +483,7 @@ class RouteController
                 $response = $response->withHeader('Vary', 'Origin');
             }
             // Allow-Credentials è incompatibile con origin "*" (spec CORS): emesso solo con origin specifica
-            if ($allowCreds && $resolvedOrigin !== '*') {
+            if ($allowCreds && $resolvedOrigin !== null && $resolvedOrigin !== '*') {
                 $response = $response->withHeader('Access-Control-Allow-Credentials', 'true');
             }
             // Max-Age ha senso solo sulla preflight: permette al browser di
