@@ -49,8 +49,7 @@ class OGPdo
             }
 
             // In produzione non esponiamo DSN/credenziali/dettagli: messaggio generico
-            $isProduction = getenv('ENVIRONMENT') === 'production' || getenv('ENV') === 'production';
-            if ($isProduction) {
+            if (Env::isProduction()) {
                 throw new PDOException('Errore di connessione al database', (int) $e->getCode());
             }
             throw $e;

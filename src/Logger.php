@@ -61,12 +61,7 @@ class Logger
                 'version' => 'latest',
                 'region' => getenv("AWS_REGION") ?: 'eu-central-1',
             ];
-            if (
-                !empty(getenv('AWS_PROFILE_NAME')) &&
-                (
-                    getenv('ENV') === 'local' || getenv('ENVIRONMENT') === 'local'
-                )
-            ) {
+            if (!empty(getenv('AWS_PROFILE_NAME')) && Env::isLocal()) {
                 $config['credentials'] = CredentialProvider::sso(getenv('AWS_PROFILE_NAME'));
             }
             $this->CloudWatchClient = new CloudWatchLogsClient($config);
@@ -403,7 +398,9 @@ class Logger
     public static function api($app): void
     {
         $secureMW = function ($request, $handler) {
-            if (getenv("ENVIRONMENT") === "production") {
+            // Doppia cintura: serve il flag esplicito E non essere in produzione.
+            // Un LOGS_UI_ENABLED dimenticato in un ConfigMap di produzione non apre nulla.
+            if (!Env::flag('LOGS_UI_ENABLED') || Env::isProduction()) {
                 return new Response()
                     ->withStatus(404);
             }

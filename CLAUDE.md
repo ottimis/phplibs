@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v5.1.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.0.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -63,6 +63,17 @@ while ($row = $db->fetchassoc($res1)) {
 - **`OGMail`** - Email via SMTP (PHPMailer) or AWS SES
 
 ### Environment Variables
+
+Ambiente (`Env`, v8.0.0+):
+- `ENV` — nome dell'ambiente, variabile **canonica** (`local`, `staging`, `production`/`prod`, ...)
+- `ENVIRONMENT` — fallback storico: usata solo se `ENV` non è definita (`?:`, la prima definita vince — NON è un OR)
+- Tutta la libreria legge l'ambiente SOLO via `ottimis\phplibs\Env`: `name()`, `is(...)`, `isProduction()` (`production` o `prod`), `isLocal()`, `flag($name)`. Mai `getenv('ENV')` diretto nel codice nuovo.
+- `local` attiva le credenziali AWS SSO (`AWS_PROFILE_NAME`) in `OGMail`/`OGStorage`/`Logger` driver aws; fuori da local si usa la default credential chain (IAM role EC2 / pod identity)
+- Nessuna delle due definita = non-produzione e non-local (degrado permissivo deliberato: le superfici di disclosure sono comunque dietro flag)
+
+Disclosure (v8.0.0+) — flag espliciti, default spento, doppia cintura (`flag && !isProduction()`: in produzione restano chiuse anche col flag acceso):
+- `ERROR_DETAILS_ENABLED` — abilita `?debug=1` in `Utils::slimErrorHandler()` (messaggio dell'eccezione in response)
+- `LOGS_UI_ENABLED` — abilita le rotte `/logs` di `Logger::api()` (altrimenti 404)
 
 Database:
 - `DB_DRIVER` — `mysql` (default) or `pgsql`. Controls which adapter `dataBase::getInstance()` returns
@@ -447,7 +458,7 @@ Utils::slimErrorHandler($app, "Errore personalizzato");
 Handles:
 - 404/405 errors → custom HTML page
 - Other exceptions → logs to Logger, returns 500
-- `?debug=1` query param shows exception message (solo se `ENVIRONMENT !== "production"`, v7.0.0+)
+- `?debug=1` query param shows exception message (v8.0.0+: solo se `ERROR_DETAILS_ENABLED=true` E non in produzione — senza flag il debug non funziona nemmeno in locale)
 
 #### getSwaggerPage() - Swagger UI
 
@@ -643,7 +654,7 @@ Crea automaticamente:
 - `GET /logs` → Lista ultimi 1000 log (HTML)
 - `GET /logs/{code}` → Log filtrati per codice
 
-**Nota**: Disabilitato automaticamente in produzione (`ENVIRONMENT=production`).
+**Nota**: v8.0.0+ risponde 404 a meno che `LOGS_UI_ENABLED=true` E non-produzione (doppia cintura: in produzione 404 anche col flag).
 
 ### Integrazione con Utils
 
@@ -855,6 +866,39 @@ public function _post(Request $request, Response $response) {
 }
 ```
 
+### Errori di validazione: 400 JSON strutturato (v8.0.0+)
+
+Il `ValidationMiddleware` (agganciato automaticamente alle route con `#[Schema]`)
+su errore risponde **JSON** — non più `text/plain` — con status 400:
+
+```json
+{
+    "error": "VALIDATION_ERROR",
+    "message": "Validation failed: 'username': Value must be at least 3 characters long; 'email': Value is required",
+    "errors": [
+        {"field": "username", "message": "Value must be at least 3 characters long"},
+        {"field": "email", "message": "Value is required"}
+    ]
+}
+```
+
+- `errors` contiene **tutti** i campi non validi (non solo il primo):
+  `validateRecord()` raccoglie ogni errore e lancia una `ValidationException`
+  (`ottimis\phplibs\ValidationException`, estende `RuntimeException`) con la
+  lista in `getErrors()` e il messaggio aggregato in `getMessage()`.
+- **Body vuoto**: con uno schema dichiarato la validazione avviene SEMPRE — una
+  `POST` senza body fallisce i campi `required` come qualsiasi payload
+  incompleto (prima della v8.0.0 il body vuoto saltava del tutto la
+  validazione). Senza schema il comportamento è invariato.
+- **Body JSON malformato** (non decodificabile, nessun form param) → 400
+  `{"error": "INVALID_JSON", "message": "Request body is not valid JSON"}`.
+
+**Migrazione da <8.0.0**: nessuna modifica al codice dei controller. I client
+che facevano parsing del 400 `text/plain` devono leggere `message` (o `errors`)
+dal JSON. Endpoint con `#[Schema]` che accettavano `POST` a body vuoto ora
+ricevono 400: se il body vuoto è legittimo, rendere i campi `required: false`
+o togliere lo schema.
+
 ### Key Enums
 
 - `UPSERT_MODE::INSERT` / `UPSERT_MODE::UPDATE`
@@ -866,32 +910,60 @@ public function _post(Request $request, Response $response) {
 
 ## OGHttp Class (HTTP Client)
 
-Wrapper cURL per chiamate HTTP con supporto Basic Auth e JWT.
+Wrapper cURL per chiamate HTTP. Dalla v8.0.0 supporta tutti i verbi, header
+arbitrari di richiesta, header di risposta, encoding del body configurabile e
+timeout configurabile.
 
 ### Instantiation
 
 ```php
 use ottimis\phplibs\OGHttp;
 
-$http = new OGHttp();
+$http = new OGHttp();          // timeout default 30s
+$http = new OGHttp(10);        // timeout 10s dal costruttore
 ```
 
-### Authentication (Fluent)
+### Configurazione (Fluent)
 
 ```php
-// Basic Auth
-$http->withBasicAuth('user', 'pass');
-
-// JWT Bearer token
-$http->withJwt($token);
+$http->withBasicAuth('user', 'pass');           // Basic Auth
+$http->withJwt($token);                          // Bearer token (non sovrascrive un header Authorization esplicito)
+$http->withTimeout(10);                          // timeout in secondi (v8.0.0+)
+$http->withHeaders(['Prefer' => 'return=minimal']); // header di default per ogni richiesta (v8.0.0+)
+$http->asForm();                                 // body array → application/x-www-form-urlencoded (v8.0.0+)
+$http->asJson();                                 // torna al default JSON
 ```
 
 ### Methods
 
 ```php
-$response = $http->get($url);
-$response = $http->post($url, $data);   // $data array, auto json_encode
-$response = $http->options($url);
+// Metodo generico (v8.0.0+)
+$response = $http->request('PATCH', $url, $body, ['If-Match' => $etag]);
+
+// Helper per verbo — get/post/options invariati, put/patch/delete nuovi (v8.0.0+)
+$response = $http->get($url, $headers = []);
+$response = $http->post($url, $data, $headers = []);
+$response = $http->put($url, $body, $headers = []);
+$response = $http->patch($url, $body, $headers = []);
+$response = $http->delete($url, $body = null, $headers = []);
+$response = $http->options($url, $headers = []);
+```
+
+**Body** (`request`, `post`, `put`, `patch`, `delete`):
+- `null` → nessun body;
+- `string` → inviata **raw così com'è** (Content-Type a carico del chiamante via `$headers`);
+- `array`/`object` → codificato secondo l'encoding dell'istanza: JSON (default, `Content-Type: application/json`) oppure form urlencoded dopo `asForm()`. Un `Content-Type` passato esplicitamente negli header vince sempre.
+
+**Header di richiesta**: `withHeaders()` imposta i default dell'istanza, il parametro `$headers` per-richiesta li sovrascrive (match case-insensitive sul nome).
+
+```php
+// Esempio: endpoint token OAuth2 (Entra ID, Google, ...)
+$res = new OGHttp()->asForm()->post($tokenUrl, [
+    'grant_type' => 'client_credentials',
+    'client_id' => $id,
+    'client_secret' => $secret,
+    'scope' => 'https://graph.microsoft.com/.default',
+]);
 ```
 
 ### Return Value (IMPORTANT)
@@ -900,11 +972,16 @@ $response = $http->options($url);
 
 ```php
 [
-    'body' => string,       // Raw response body (stringa, NON già decodificata)
-    'statusCode' => int,    // HTTP status code
+    'body' => string,       // Raw response body (stringa, NON già decodificata; '' su errore di trasporto)
+    'statusCode' => int,    // HTTP status code (0 su errore di trasporto)
     'timeout' => bool,      // true se la richiesta è andata in timeout
+    'headers' => array,     // v8.0.0+: header di risposta, nomi minuscoli ('retry-after', 'etag', ...)
+    'error' => ?string,     // v8.0.0+: messaggio cURL su errore di trasporto, null altrimenti
 ]
 ```
+
+- `headers`: nomi **normalizzati in minuscolo**; duplicati uniti con `", "`; in caso di redirect/1xx si tengono solo gli header dell'ultima risposta. Utile per backoff su 429/503 (`$res['headers']['retry-after']`), `location`, `etag`, paginazione.
+- `error`: distingue l'errore di trasporto cURL (DNS, connessione rifiutata, timeout...) dallo `statusCode = 0` nudo.
 
 **⚠️ Errore comune**: `body` è una stringa raw. Per ottenere dati JSON, devi fare `json_decode()` manualmente:
 
@@ -915,10 +992,6 @@ $data = json_decode($response['body'], true);  // ✅ Corretto
 // ❌ SBAGLIATO: $response NON è la risposta raw, è un array
 // $data = json_decode($response, true);
 ```
-
-### Timeout
-
-Default: 30 secondi. Non configurabile dall'esterno (proprietà privata).
 
 ---
 

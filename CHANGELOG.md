@@ -1,5 +1,35 @@
 # Changelog
 
+## [8.0.0] - 2026-08-18
+
+### Breaking Changes
+
+- **Errori di validazione → 400 JSON strutturato (non più `text/plain`).** Il `ValidationMiddleware` (agganciato automaticamente alle route con `#[Schema]`) su errore risponde `{"error": "VALIDATION_ERROR", "message": "...", "errors": [{"field", "message"}, ...]}` con **tutti** i campi non validi, non solo il primo: `RouteController::validateRecord()` raccoglie ogni errore e lancia una `ValidationException` (`ottimis\phplibs\ValidationException`, estende `RuntimeException` → i catch esistenti continuano a funzionare) con la lista in `getErrors()` e il messaggio aggregato (`Validation failed: 'campo': msg; ...` — formato diverso dal vecchio `There is an error validating '...'`).
+  - **Migrazione**: nessuna modifica ai controller. I client che facevano parsing del 400 `text/plain` devono leggere `message` (o `errors`) dal JSON.
+- **Body vuoto con `#[Schema]` dichiarato: ora viene validato SEMPRE.** Prima della 8.0.0 una richiesta a body vuoto saltava del tutto la validazione; ora i campi `required` falliscono come per qualsiasi payload incompleto. Senza schema il comportamento è invariato.
+  - **Migrazione**: se il body vuoto è legittimo su un endpoint con schema, rendere i campi `required: false` o togliere lo schema.
+- **Body JSON malformato → 400 `{"error": "INVALID_JSON", "message": "Request body is not valid JSON"}`** (se non ci sono form param). Prima veniva silenziosamente trattato come body vuoto.
+- **`?debug=1` in `Utils::slimErrorHandler()` ora richiede il flag esplicito `ERROR_DETAILS_ENABLED` (default: spento).** Prima bastava `ENVIRONMENT !== "production"`: la disclosure era dedotta dal nome dell'ambiente, e uno staging esposto su internet mostrava messaggi d'eccezione (query SQL, path interni) a chiunque. Doppia cintura: anche col flag acceso, in produzione la risposta resta il messaggio generico.
+  - **Migrazione**: negli ambienti di sviluppo dove si usa `?debug=1`, settare `ERROR_DETAILS_ENABLED=true`. Senza flag il debug **non funziona più nemmeno in locale**.
+- **Le rotte `/logs` di `Logger::api()` ora richiedono il flag esplicito `LOGS_UI_ENABLED` (default: spento → 404).** Stessa logica e stessa doppia cintura di `ERROR_DETAILS_ENABLED`: in produzione 404 anche col flag acceso.
+  - **Migrazione**: settare `LOGS_UI_ENABLED=true` negli ambienti non-produzione dove si consulta `/logs`.
+- **`ENV`/`ENVIRONMENT` consolidate nel nuovo accessor `Env` — cambia la risoluzione quando le due divergono o se ne setta una sola.** `ENV` è la canonica, `ENVIRONMENT` il fallback per i progetti storici: la prima definita vince (`?:`), la divergenza tra le due smette di essere significativa. Conseguenze osservabili:
+  - `OGPdo`/`PdoConnect` prima facevano OR (bastava una delle due a dire produzione): ora se `ENV` è definita, `ENVIRONMENT` viene ignorata.
+  - I siti che leggevano solo `ENVIRONMENT` (`Utils::slimErrorHandler`, `Logger::api`) ora vedono anche `ENV`: un progetto con solo `ENV=production` prima risultava *non*-produzione (bug), ora produzione.
+  - **`prod` ora conta come produzione** accanto a `production` (`Env::isProduction()`): un deploy con `ENVIRONMENT=prod` prima risultava non-produzione (con `?debug=1` e `/logs` aperti!), ora è correttamente chiuso. Verificare i ConfigMap che usano questo valore.
+  - Il matching è case-insensitive e con trim; nessuna delle due definita = non-produzione e non-local (degrado permissivo storico, ora mitigato dai flag espliciti sopra).
+  - I check `local` per le credenziali AWS SSO (`OGMail`, `OGStorage`, `Logger` driver aws) mantengono la stessa semantica: attivano l'SSO **solo** in locale; staging e produzione continuano a usare la default credential chain (IAM role della EC2 / pod identity).
+
+### Added
+
+- **`Env`** (`ottimis\phplibs\Env`) — accessor unico per il nome dell'ambiente: `name()`, `is(...$names)`, `isProduction()`, `isLocal()`, `flag($name)` (parser booleano per flag espliciti: `true`/`1`/`on`/`yes`). Tutti i `getenv('ENV')`/`getenv('ENVIRONMENT')` della libreria passano da qui.
+- **`OGHttp` — client HTTP completo**:
+  - `request(string $method, string $url, mixed $body = null, array $headers = [])` generico + helper `put()`, `patch()`, `delete()`; `get()`, `post()`, `options()` accettano ora `$headers` per-richiesta.
+  - `withHeaders(array $headers)` — header di default dell'istanza (i per-richiesta vincono, match case-insensitive); `withTimeout(int $seconds)` e timeout nel costruttore (`new OGHttp(10)`).
+  - `asForm()` / `asJson()` — encoding del body array/object (`application/x-www-form-urlencoded` o JSON, default). Una stringa passa raw; un `Content-Type` esplicito negli header vince sempre.
+  - Response arricchita (retrocompatibile): `headers` (header di risposta, nomi minuscoli, duplicati uniti con `", "`, solo l'ultima risposta in caso di redirect) e `error` (messaggio cURL su errore di trasporto, `null` altrimenti).
+- **`ValidationException`** — porta la lista completa dei campi non validi (`getErrors()`).
+
 ## [7.3.1] - 2026-06-30
 
 ### Changed

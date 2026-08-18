@@ -1123,9 +1123,11 @@ class Utils
             error_log(json_encode($logData, JSON_THROW_ON_ERROR), 0);
 
             $response = $app->getResponseFactory()->createResponse();
-            // ?debug=1 esposto solo fuori da produzione: il messaggio dell'eccezione
-            // può contenere query SQL, path e altri dettagli interni.
-            $debugAllowed = getenv("ENVIRONMENT") !== "production";
+            // ?debug=1: il messaggio dell'eccezione può contenere query SQL, path e
+            // altri dettagli interni. Serve il flag esplicito E non essere in
+            // produzione (doppia cintura: il flag distingue gli ambienti
+            // non-produzione tra loro, mai riapre la produzione).
+            $debugAllowed = Env::flag('ERROR_DETAILS_ENABLED') && !Env::isProduction();
             if ($debugAllowed && !empty($logData['QueryParams']['debug'])) {
                 $response->getBody()->write($exception->getMessage());
             } else {

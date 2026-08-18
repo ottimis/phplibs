@@ -64,7 +64,7 @@ class OGStorage
                 'key' => $accessKey,
                 'secret' => $secret,
             ];
-        } elseif (getenv('ENV') === 'local' && !empty(getenv('AWS_PROFILE_NAME'))) {
+        } elseif (Env::isLocal() && !empty(getenv('AWS_PROFILE_NAME'))) {
             $config['credentials'] = CredentialProvider::sso(getenv('AWS_PROFILE_NAME'));
         }
         // Otherwise let the SDK use the default credential chain (IAM role, instance profile, etc.)

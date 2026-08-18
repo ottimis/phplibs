@@ -38,7 +38,7 @@ class OGMail
             $config = [
                 'version' => 'latest',
             ];
-            if (getenv('ENV') === 'local')   {
+            if (Env::isLocal())   {
                 $provider = CredentialProvider::sso(getenv("AWS_PROFILE_NAME"));
                 $config['credentials'] = $provider;
             }

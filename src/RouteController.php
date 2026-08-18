@@ -169,7 +169,12 @@ class RouteController
     }
 
     /**
+     * Valida $data contro gli attributi Validator dello schema. Raccoglie TUTTI
+     * i campi non validi e lancia una ValidationException unica a fine giro
+     * (non più al primo errore), con la lista completa in getErrors().
+     *
      * @throws ReflectionException
+     * @throws ValidationException
      */
     public function validateRecord(array $data, mixed $schema): array
     {
@@ -178,6 +183,7 @@ class RouteController
         $properties = $reflection->getProperties();
 
         $record = [];
+        $errors = [];
         foreach ($properties as $property) {
             $isReadOnly = false;
 
@@ -207,7 +213,8 @@ class RouteController
                 // Validate property
                 $resValid = $validator->validate($data[$propertyName] ?? null);
                 if (!$resValid['success']) {
-                    throw new RuntimeException("There is an error validating '$propertyName': " . $resValid['message']);
+                    $errors[] = ['field' => $propertyName, 'message' => $resValid['message']];
+                    continue 2;
                 }
             }
             // Skip only null (field absent / no default): falsy-but-valid values
@@ -215,6 +222,10 @@ class RouteController
             if (!$isReadOnly && $resValid['value'] !== null) {
                 $record[$propertyName] = $resValid['value'];
             }
+        }
+
+        if (!empty($errors)) {
+            throw new ValidationException($errors);
         }
 
         return $record;
