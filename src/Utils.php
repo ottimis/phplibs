@@ -34,6 +34,26 @@ class Utils
     }
 
     /**
+     * Quota un identificatore (colonna, eventualmente `tabella.colonna`) con il
+     * delimitatore del driver: backtick su MySQL, doppi apici su PostgreSQL.
+     * Copre tutte le parole riservate (key, group, order, rank, ...) senza
+     * mantenere una lista. Identificatori già quotati o non "semplici"
+     * (espressioni, `*`) vengono lasciati intatti.
+     */
+    private function quoteIdentifier(string $identifier): string
+    {
+        $identifier = trim($identifier);
+        $q = $this->isPgsql() ? '"' : '`';
+        if ($identifier === '' || $identifier === '*' || str_contains($identifier, $q)) {
+            return $identifier;
+        }
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/', $identifier)) {
+            return $identifier;
+        }
+        return implode('.', array_map(static fn($part) => $q . $part . $q, explode('.', $identifier)));
+    }
+
+    /**
      * Get the singleton instance of the class if it exists, otherwise create it
      *
      * @param string $dbName
@@ -92,23 +112,40 @@ class Utils
             };
         }, $ar);
 
-        // Merge $key + "=" + $value
+        // Merge quoted $key + "=" + $value
+        $quotedKeys = array_map(fn($k) => $this->quoteIdentifier((string)$k), array_keys($ar));
         $mergedAr = array();
-        foreach ($ar as $k => $v) {
-            $mergedAr[] = "$k=$v";
+        foreach (array_values($ar) as $i => $v) {
+            $mergedAr[] = "{$quotedKeys[$i]}=$v";
         }
         $mergedValues = implode(", ", $mergedAr);
 
         try {
-            if ($bInsert) {
-                $columns = implode(", ", array_keys($ar));
+            if ($mode === UPSERT_MODE::INSERT) {
+                $columns = implode(", ", $quotedKeys);
                 $values = implode(", ", $ar);
                 $sql = "INSERT INTO $table ($columns) VALUES ($values)";
                 if (!$noUpdate) {
-                    $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
+                    if ($isPgsql) {
+                        $conflictCols = implode(", ", array_map(fn($k) => $this->quoteIdentifier($k), $conflictKeys));
+                        // PG ON CONFLICT uses EXCLUDED.column to reference the new values
+                        $excludedAr = array_map(static fn($k) => "$k=EXCLUDED.$k", $quotedKeys);
+                        $sql .= " ON CONFLICT ($conflictCols) DO UPDATE SET " . implode(", ", $excludedAr);
+                    } else {
+                        $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
+                    }
+                } elseif ($isPgsql) {
+                    $conflictCols = implode(", ", array_map(fn($k) => $this->quoteIdentifier($k), $conflictKeys));
+                    $sql .= " ON CONFLICT ($conflictCols) DO NOTHING";
+                }
+                if ($isPgsql) {
+                    $sql .= " RETURNING id";
                 }
             } else {
-                $sql = sprintf("UPDATE %s SET %s WHERE %s='%s'", $table, $mergedValues, $idfield, $idvalue);
+                $where = implode(" AND ", array_map(function ($v, $k) use ($db) {
+                    return $this->quoteIdentifier((string)$k) . " = '" . $db->real_escape_string($v) . "'";
+                }, $fieldWhere, array_keys($fieldWhere)));
+                $sql = sprintf("UPDATE %s SET %s WHERE %s", $table, $mergedValues, $where);
             }
 
             $ret['sql'] = $sql;

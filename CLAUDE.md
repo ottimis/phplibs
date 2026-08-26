@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.0.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.0.1) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -376,6 +376,8 @@ $result = $utils->upsert(UPSERT_MODE::UPDATE, "users",
 | `null` | `NULL` |
 | `array` / `object` | JSON encoded string |
 | other | Escaped string |
+
+**Identificatori quotati (v8.0.1+)**: nomi di colonna (chiavi di `$ar`, `$fieldWhere`, `$conflictKeys`) vengono quotati automaticamente — backtick su MySQL, doppi apici su PostgreSQL, anche in forma `alias.colonna` — quindi parole riservate come `key`, `group`, `order`, `rank` funzionano senza intervento. Il nome tabella NON viene quotato (può contenere alias/schema). Su PG il quoting rende il nome case-sensitive: usare colonne minuscole.
 
 #### Return Value
 
@@ -1040,6 +1042,8 @@ $cache->ttl('key');                          // int (-1 no scadenza, -2 non esis
 $cache->raw();                               // OGCache con prefix vuoto (chiavi globali)
 $cache->getRedis();                          // \Redis instance
 ```
+
+> **Tipi (v8.0.1+)**: la serializzazione JSON usa `JSON_PRESERVE_ZERO_FRACTION`, quindi un `float` come `19.0` torna `float` dalla cache (prima diventava `int`). Un `int` resta `int` e una stringa `"19.00"` resta stringa: il tipo restituito è quello passato a `set()`/calcolato in `remember()`.
 
 ### Chiavi non prefissate: `raw()`
 

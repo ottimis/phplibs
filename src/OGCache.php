@@ -115,7 +115,7 @@ class OGCache
      */
     public function set(string $key, mixed $value, int $ttl = 0): bool
     {
-        $serialized = is_string($value) ? $value : json_encode($value, JSON_THROW_ON_ERROR);
+        $serialized = is_string($value) ? $value : json_encode($value, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
 
         if ($ttl > 0) {
             return $this->redis->setex($this->prefix . $key, $ttl, $serialized);
