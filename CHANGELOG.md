@@ -1,5 +1,37 @@
 # Changelog
 
+## [8.2.0] - 2026-08-28
+
+### Added
+
+- **`TIMEZONE` — timezone dell'applicazione, condivisa tra PHP e DB.** Una sola variabile per il default PHP e per il timezone di sessione della connessione DB, con override sempre più specifici dove i due devono divergere. Catena, la prima definita vince: `DB_TIMEZONE_{name}` → `DB_TIMEZONE` → `TIMEZONE`. Nessuna definita (o vuota) = nessuna `SET` e default PHP invariato: retrocompatibile.
+  - **Lato DB** (`dataBase` → `SET time_zone = '...'`, `dataBasePgsql` → `SET TIME ZONE '...'`, subito dopo la connessione): stesso schema di `SQL_MODE` ma valido su entrambi i driver. Logica condivisa nel trait `ottimis\phplibs\Traits\SessionTimezone`, ogni classe fornisce solo la sintassi del proprio dialetto. Il valore è validato prima di finire nel literal SQL (nome IANA, `UTC`/`SYSTEM`/`Local`, offset `+02:00`; max 64 caratteri): un apice o un `;` nell'env viene rifiutato con `RuntimeException`. Un timezone che il server rifiuta fa fallire la connessione invece di proseguire: continuare significherebbe leggere e scrivere date sfasate in silenzio.
+  - **Lato PHP**: `Env::timezone(): ?string` legge la variabile, `Env::applyTimezone(): bool` imposta il default PHP (`date()`, `strtotime()`, `DateTime`). Da chiamare esplicitamente in `index.php` — la libreria non lo fa da sola, è stato globale del processo.
+  - **⚠️ Attrito di formato tra i due consumatori**: MySQL senza tz tables caricate (`mysql_tzinfo_to_sql`, **assenti nelle immagini `mysql` ufficiali**) accetta solo l'offset `+02:00`, che però **non è un identificatore PHP valido** (`date_default_timezone_set('+02:00') === false`, come `SYSTEM`/`Local`). In quel caso: `TIMEZONE=Europe/Rome` per l'app e `DB_TIMEZONE=+02:00` solo per la connessione — è esattamente il motivo per cui esiste il livello intermedio. `applyTimezone()` in quel caso ritorna `false` senza toccare nulla né emettere warning. PostgreSQL conosce sempre i nomi IANA.
+  - Non tocca `OGPdo`/`PdoConnect`, che restano con la configurazione del server.
+
+## [8.1.0] - 2026-08-26
+
+### Added
+
+- **`Utils::serveOpenApi($response, $staticPath, $scanDirs = [])`** — serve la spec OpenAPI senza rigenerarla ad ogni richiesta. Finora ogni progetto chiamava `OpenApi\Generator` dentro l'handler di `/docs`: ~7 s di CPU e ~700 KB per GET su un endpoint pubblico, cioè un DoS gratuito. Ordine di risoluzione: gate chiuso → 404; `$staticPath` leggibile → file servito in streaming con `Cache-Control: public, max-age=3600`; `Env::isLocal()` + `$scanDirs` → generazione live con `Cache-Control: no-store` (in dev `src` è montato e la spec statica non esiste); altrimenti 404 `{"error":"docs_disabled"}`. Il 404 è identico nei due casi: non rivela se la spec sia stata buildata.
+- **`Utils::buildOpenApi(array $dirs, string $out): int`** e il comando **`vendor/bin/og-openapi-build <scanDirs...> <out.json>`** — generano la spec a build-time (da chiamare nel `Dockerfile` del progetto, es. `RUN php vendor/bin/og-openapi-build routes classes schemas public/openapi.json`). Il comando avvisa su stderr se la spec risulta senza path (sintomo tipico di classi non autoloadabili: swagger-php le salta in silenzio e produce una spec vuota ma valida).
+- **`Utils::serveSwaggerPage($response, $jsonEndpoint, $title)`** — variante di `getSwaggerPage()` che applica il gate e sa rispondere con status 404.
+- **`Utils::docsEnabled(): bool`** — gate delle superfici di documentazione.
+- **`DOCS_ENABLED`** — nuova env var. **Semantica invertita rispetto a `ERROR_DETAILS_ENABLED`/`LOGS_UI_ENABLED`**: quelli sono `flag && !isProduction()` (il flag non riapre mai la produzione), qui fuori produzione i docs sono aperti di default e in produzione servono `DOCS_ENABLED=true`. La spec è documentazione d'API, non disclosure di interni: chiuderla in produzione è il default sensato, riaprirla su una API pubblica è legittimo.
+
+### Changed
+
+- **`Utils::getSwaggerPage()` ora rispetta il gate docs**: in produzione senza `DOCS_ENABLED=true` restituisce la pagina 404 della libreria invece della Swagger UI (nessun riferimento all'endpoint della spec). La firma resta `string` per retrocompatibilità, quindi lo status resta quello impostato dal chiamante: per rispondere con un 404 corretto usare `serveSwaggerPage()`.
+  - **Migrazione**: se la Swagger UI deve restare visibile in produzione, settare `DOCS_ENABLED=true`.
+
+## [8.0.1] - 2026-08-18
+
+### Fixed
+
+- **`Utils::upsert()` quota gli identificatori di colonna** (backtick su MySQL, doppi apici su PostgreSQL, anche in forma `alias.colonna`): le parole riservate (`key`, `group`, `order`, `rank`, ...) funzionano senza intervento. Il nome tabella non viene quotato (può contenere alias/schema); su PG il quoting rende il nome case-sensitive, usare colonne minuscole.
+- **`OGCache` preserva la parte decimale dei float** (`JSON_PRESERVE_ZERO_FRACTION`): un `19.0` messo in cache torna `float`, non più `int`.
+
 ## [8.0.0] - 2026-08-18
 
 ### Breaking Changes

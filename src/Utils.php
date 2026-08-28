@@ -1190,6 +1190,14 @@ class Utils
      */
     public static function getSwaggerPage(string $jsonEndpoint, string $title = 'API Documentation'): string
     {
+        // Stesso gate di serveOpenApi(): in produzione la UI è chiusa salvo DOCS_ENABLED.
+        // La firma resta `string` per retrocompatibilità, quindi a gate chiuso si
+        // restituisce la pagina 404 della libreria (nessun riferimento alla spec).
+        // Per rispondere anche con lo status 404 corretto usare serveSwaggerPage().
+        if (!self::docsEnabled()) {
+            return file_get_contents(__DIR__ . "/404/1.html") ?: '';
+        }
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="it">
@@ -1255,6 +1263,140 @@ HTML;
     public static function generateOpenApi(iterable $sources, bool $validate = true): ?\OpenApi\Annotations\OpenApi
     {
         return (new \OpenApi\Generator())->generate($sources, null, $validate);
+    }
+
+    /**
+     * Gate delle superfici di documentazione (spec OpenAPI + Swagger UI).
+     *
+     * ATTENZIONE, semantica DIVERSA da ERROR_DETAILS_ENABLED/LOGS_UI_ENABLED:
+     * quelli sono `flag && !isProduction()` (il flag non riapre mai la produzione),
+     * qui il default è invertito — fuori produzione i docs sono APERTI, in
+     * produzione servono il flag esplicito `DOCS_ENABLED=true`. La spec è
+     * documentazione d'API, non disclosure di interni: chiuderla in produzione è
+     * la scelta di default, riaprirla su una API pubblica è legittimo.
+     */
+    public static function docsEnabled(): bool
+    {
+        return !Env::isProduction() || Env::flag('DOCS_ENABLED');
+    }
+
+    /**
+     * 404 JSON uniforme per tutte le superfici docs: non distingue "gate chiuso"
+     * da "spec non buildata", così non rivela nulla sul deploy.
+     */
+    private static function docsDisabledResponse(\Psr\Http\Message\ResponseInterface $response): \Psr\Http\Message\ResponseInterface
+    {
+        $response->getBody()->write(json_encode(["error" => "docs_disabled"], JSON_THROW_ON_ERROR));
+
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(404);
+    }
+
+    /**
+     * Serve la spec OpenAPI in modo sicuro ed economico.
+     *
+     * Rigenerare la spec ad ogni GET con `OpenApi\Generator` costa secondi di CPU
+     * e centinaia di KB per richiesta: su un endpoint pubblico è un DoS gratuito.
+     * Qui la spec si serve dal file statico prodotto a build-time
+     * (`vendor/bin/og-openapi-build`, vedi buildOpenApi()); la generazione live
+     * resta solo in locale, dove `src` è montato e il file statico non esiste.
+     *
+     * Ordine di risoluzione:
+     *  1. gate chiuso (produzione senza `DOCS_ENABLED`) → 404 `{"error":"docs_disabled"}`
+     *  2. `$staticPath` leggibile → file servito in streaming, `Cache-Control: public, max-age=3600`
+     *  3. `Env::isLocal()` e `$scanDirs` non vuoto → generazione live, `Cache-Control: no-store`
+     *  4. altrimenti → 404 `{"error":"docs_disabled"}`
+     *
+     * @param \Psr\Http\Message\ResponseInterface $response Response su cui scrivere
+     * @param string                              $staticPath Path della spec generata a build-time
+     * @param array                               $scanDirs Sorgenti da scansionare per la generazione live (solo local)
+     */
+    public static function serveOpenApi(
+        \Psr\Http\Message\ResponseInterface $response,
+        string $staticPath,
+        array $scanDirs = []
+    ): \Psr\Http\Message\ResponseInterface {
+        if (!self::docsEnabled()) {
+            return self::docsDisabledResponse($response);
+        }
+
+        if (is_file($staticPath) && is_readable($staticPath)) {
+            $handle = fopen($staticPath, 'rb');
+            if ($handle !== false) {
+                $response = $response->withBody(new \Slim\Psr7\Stream($handle));
+                $size = filesize($staticPath);
+                if ($size !== false) {
+                    $response = $response->withHeader('Content-Length', (string) $size);
+                }
+
+                return $response
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withHeader('Cache-Control', 'public, max-age=3600');
+            }
+        }
+
+        // Solo in locale: in dev `src` è montato e la spec statica non c'è.
+        if (Env::isLocal() && $scanDirs !== []) {
+            $spec = self::generateOpenApi($scanDirs);
+            if ($spec !== null) {
+                $response->getBody()->write($spec->toJson());
+
+                return $response
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withHeader('Cache-Control', 'no-store');
+            }
+        }
+
+        return self::docsDisabledResponse($response);
+    }
+
+    /**
+     * Serve la Swagger UI applicando il gate docs (404 JSON quando chiuso).
+     * Preferire questa a getSwaggerPage(), che non può impostare lo status.
+     */
+    public static function serveSwaggerPage(
+        \Psr\Http\Message\ResponseInterface $response,
+        string $jsonEndpoint,
+        string $title = 'API Documentation'
+    ): \Psr\Http\Message\ResponseInterface {
+        if (!self::docsEnabled()) {
+            return self::docsDisabledResponse($response);
+        }
+
+        $response->getBody()->write(self::getSwaggerPage($jsonEndpoint, $title));
+
+        return $response->withHeader('Content-Type', 'text/html');
+    }
+
+    /**
+     * Genera la spec OpenAPI e la scrive su file. Da chiamare a build-time
+     * (Dockerfile) via `vendor/bin/og-openapi-build <scanDirs...> <out>`, così a
+     * runtime serveOpenApi() serve solo un file statico.
+     *
+     * @param array  $dirs Sorgenti da scansionare
+     * @param string $out  Path del file JSON da scrivere (la directory viene creata se manca)
+     * @return int Byte scritti
+     * @throws RuntimeException se la generazione o la scrittura falliscono
+     */
+    public static function buildOpenApi(array $dirs, string $out): int
+    {
+        $spec = self::generateOpenApi($dirs);
+        if ($spec === null) {
+            throw new RuntimeException("OpenAPI generation produced no spec for: " . implode(', ', $dirs));
+        }
+
+        $dir = dirname($out);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException("Cannot create output directory: " . $dir);
+        }
+
+        $bytes = file_put_contents($out, $spec->toJson());
+        if ($bytes === false) {
+            throw new RuntimeException("Cannot write OpenAPI spec to: " . $out);
+        }
+
+        return $bytes;
     }
 
     /**

@@ -1,0 +1,63 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * og-openapi-build <scanDir|scanFile>... <out.json>
+ *
+ * Genera la spec OpenAPI a build-time (Dockerfile) così che a runtime
+ * Utils::serveOpenApi() serva solo un file statico, invece di rigenerarla ad
+ * ogni GET su /docs (secondi di CPU e centinaia di KB per richiesta).
+ *
+ * Esempio nel Dockerfile del progetto:
+ *   RUN php vendor/bin/og-openapi-build routes classes schemas public/openapi.json
+ */
+
+$autoloads = [
+    __DIR__ . '/../vendor/autoload.php',   // repo della libreria
+    __DIR__ . '/../../../autoload.php',    // installata in vendor/ottimis/phplibs
+];
+foreach ($autoloads as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+        break;
+    }
+}
+
+if (!class_exists(\ottimis\phplibs\Utils::class)) {
+    fwrite(STDERR, "og-openapi-build: autoloader Composer non trovato.\n");
+    exit(1);
+}
+
+$args = array_slice($argv, 1);
+if (count($args) < 2) {
+    fwrite(STDERR, "Uso: og-openapi-build <scanDir|scanFile>... <out.json>\n");
+    exit(1);
+}
+
+$out = array_pop($args);
+foreach ($args as $source) {
+    if (!is_dir($source) && !is_file($source)) {
+        fwrite(STDERR, "og-openapi-build: sorgente inesistente: {$source}\n");
+        exit(1);
+    }
+}
+
+try {
+    $bytes = \ottimis\phplibs\Utils::buildOpenApi($args, $out);
+} catch (\Throwable $e) {
+    fwrite(STDERR, "og-openapi-build: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+fwrite(STDOUT, sprintf("og-openapi-build: spec scritta in %s (%d byte)\n", $out, $bytes));
+
+// swagger-php salta silenziosamente le classi che non riesce a caricare ("Skipping
+// unknown ..."): il risultato è una spec sintatticamente valida ma vuota, che
+// verrebbe poi servita in produzione senza che nessuno se ne accorga.
+$spec = json_decode((string) file_get_contents($out), true);
+if (empty($spec['paths'])) {
+    fwrite(STDERR, "og-openapi-build: ATTENZIONE, la spec non contiene nessun path.\n");
+    fwrite(STDERR, "  Le classi annotate devono essere autoloadabili (PSR-4 in composer.json) e le sorgenti includere un #[OA\\Info].\n");
+}
+
+exit(0);

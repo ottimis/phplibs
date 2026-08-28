@@ -3,12 +3,15 @@
 namespace ottimis\phplibs;
 
 use ottimis\phplibs\Interfaces\DatabaseInterface;
+use ottimis\phplibs\Traits\SessionTimezone;
 use PDO;
 use PDOStatement;
 use RuntimeException;
 
 class dataBasePgsql implements DatabaseInterface
 {
+    use SessionTimezone;
+
     private static array $instances = [];
     protected string $host = '';
     protected string $user = '';
@@ -35,6 +38,16 @@ class dataBasePgsql implements DatabaseInterface
         } catch (\PDOException $e) {
             throw new RuntimeException("Could not connect to PostgreSQL: " . $e->getMessage());
         }
+
+        $this->applySessionTimezone($dbname);
+    }
+
+    /**
+     * PostgreSQL conosce sempre i nomi IANA (non servono tz tables).
+     */
+    protected function timezoneSql(string $tz): string
+    {
+        return "SET TIME ZONE '" . $tz . "'";
     }
 
     public static function getInstance(string $dbname = "default"): self

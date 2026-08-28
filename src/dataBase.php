@@ -5,10 +5,13 @@ namespace ottimis\phplibs;
 use mysqli;
 use mysqli_result;
 use ottimis\phplibs\Interfaces\DatabaseInterface;
+use ottimis\phplibs\Traits\SessionTimezone;
 use RuntimeException;
 
 class dataBase implements DatabaseInterface
 {
+    use SessionTimezone;
+
     private static array $instances = [];
     protected string $host = '';
     protected string $user = '';
@@ -52,6 +55,16 @@ class dataBase implements DatabaseInterface
         } elseif (getenv("SQL_MODE") !== false) {
             $this->query("SET sql_mode = '" . getenv("SQL_MODE") . "';");
         }
+        $this->applySessionTimezone($dbname);
+    }
+
+    /**
+     * MySQL: i nomi IANA funzionano solo se il server ha le tz tables caricate,
+     * l'offset fisso ('+02:00') sempre. Vedi SessionTimezone.
+     */
+    protected function timezoneSql(string $tz): string
+    {
+        return "SET time_zone = '" . $tz . "'";
     }
 
     /**

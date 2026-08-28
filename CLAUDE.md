@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.0.1) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.2.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -71,15 +71,25 @@ Ambiente (`Env`, v8.0.0+):
 - `local` attiva le credenziali AWS SSO (`AWS_PROFILE_NAME`) in `OGMail`/`OGStorage`/`Logger` driver aws; fuori da local si usa la default credential chain (IAM role EC2 / pod identity)
 - Nessuna delle due definita = non-produzione e non-local (degrado permissivo deliberato: le superfici di disclosure sono comunque dietro flag)
 
+Timezone (v8.2.0+) — `TIMEZONE` è la variabile unica, condivisa tra PHP e DB. Catena, la prima definita vince: `DB_TIMEZONE_{name}` → `DB_TIMEZONE` → `TIMEZONE`; nessuna definita = default del server e default PHP invariato.
+- Lato DB: applicata alla connessione (`SET time_zone` su MySQL, `SET TIME ZONE` su PostgreSQL), validata prima di finire nel literal SQL
+- Lato PHP: `Env::timezone()` legge, `Env::applyTimezone()` imposta il default PHP — **va chiamata esplicitamente in `index.php`**, la libreria non lo fa da sola
+- **Attrito di formato**: MySQL senza tz tables (`mysql_tzinfo_to_sql`, assenti nelle immagini `mysql` ufficiali) accetta solo l'offset `+02:00`, che NON è un identificatore PHP valido (come `SYSTEM`/`Local`) → `applyTimezone()` ritorna `false`. In quel caso `TIMEZONE=Europe/Rome` per l'app e `DB_TIMEZONE=+02:00` solo per il DB: è il motivo per cui esiste il livello intermedio
+
 Disclosure (v8.0.0+) — flag espliciti, default spento, doppia cintura (`flag && !isProduction()`: in produzione restano chiuse anche col flag acceso):
 - `ERROR_DETAILS_ENABLED` — abilita `?debug=1` in `Utils::slimErrorHandler()` (messaggio dell'eccezione in response)
 - `LOGS_UI_ENABLED` — abilita le rotte `/logs` di `Logger::api()` (altrimenti 404)
+
+Documentazione API (v8.1.0+) — **gate con semantica opposta** a quelli sopra (i docs non sono disclosure di interni): fuori produzione aperti, in produzione chiusi salvo flag.
+- `DOCS_ENABLED` — `true` riapre in produzione la spec (`Utils::serveOpenApi()`) e la Swagger UI (`getSwaggerPage()`/`serveSwaggerPage()`); senza flag, in produzione rispondono 404
 
 Database:
 - `DB_DRIVER` — `mysql` (default) or `pgsql`. Controls which adapter `dataBase::getInstance()` returns
 - `DB_DRIVER_{name}` — Per-database driver override for named connections
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`
 - `DB_CHARSET` — charset connessione mysqli (default: `utf8mb4`, v7.0.0+)
+- `DB_TIMEZONE` / `DB_TIMEZONE_{name}` — override DB del timezone di sessione (v8.2.0+); senza di essi vale `TIMEZONE` (vedi sezione Ambiente). Non impostato nulla = default del server. Un timezone rifiutato dal server è un errore fatale alla connessione, non un warning
+- `SQL_MODE` / `SQL_MODE_LEGACY` — `sql_mode` di sessione (solo MySQL); `SQL_MODE_LEGACY=true` azzera il sql_mode
 - Multi-db: `DB_HOST_{name}`, `DB_USER_{name}`, etc.
 
 Logging:
@@ -462,15 +472,41 @@ Handles:
 - Other exceptions → logs to Logger, returns 500
 - `?debug=1` query param shows exception message (v8.0.0+: solo se `ERROR_DETAILS_ENABLED=true` E non in produzione — senza flag il debug non funziona nemmeno in locale)
 
-#### getSwaggerPage() - Swagger UI
+#### serveOpenApi() - Spec OpenAPI (v8.1.0+)
+
+**MAI rigenerare la spec dentro l'handler HTTP**: `OpenApi\Generator` costa secondi di CPU e centinaia di KB per richiesta — su `/docs`, pubblico, è un DoS gratuito. La spec si genera a build-time e si serve statica.
 
 ```php
+// Dockerfile del progetto (dopo composer install e COPY src)
+// RUN php vendor/bin/og-openapi-build routes classes schemas public/openapi.json
+
+$app->get('/api/openapi.json', fn($request, $response) => Utils::serveOpenApi(
+    $response,
+    __DIR__ . '/public/openapi.json',   // spec buildata: streaming + Cache-Control 1h
+    [__DIR__ . '/routes', __DIR__ . '/schemas'], // fallback live SOLO in Env::isLocal()
+));
+```
+
+Ordine di risoluzione: gate chiuso → 404 `{"error":"docs_disabled"}`; `$staticPath` leggibile → file servito con `Cache-Control: public, max-age=3600`; `Env::isLocal()` + `$scanDirs` → generazione live (`no-store`, in dev `src` è montato e la spec statica non c'è); altrimenti → stesso 404 (non rivela se la spec sia stata buildata).
+
+`Utils::buildOpenApi(array $dirs, string $out): int` è l'equivalente programmatico del comando. Se la spec esce senza path, le classi annotate non sono autoloadabili (swagger-php le salta in silenzio): il comando lo segnala su stderr.
+
+#### getSwaggerPage() / serveSwaggerPage() - Swagger UI
+
+```php
+// Preferire serveSwaggerPage(): applica il gate e sa rispondere 404
+$app->get('/docs', fn($request, $response) => Utils::serveSwaggerPage($response, '/api/openapi.json', 'My API Docs'));
+
+// getSwaggerPage() resta disponibile (ritorna string); a gate chiuso ritorna la
+// pagina 404 della libreria, ma lo status lo imposta il chiamante
 $app->get('/docs', function ($request, $response) {
     $html = Utils::getSwaggerPage('/api/openapi.json', 'My API Docs');
     $response->getBody()->write($html);
     return $response->withHeader('Content-Type', 'text/html');
 });
 ```
+
+Entrambe passano da `Utils::docsEnabled()` (`!Env::isProduction() || Env::flag('DOCS_ENABLED')`).
 
 ---
 
