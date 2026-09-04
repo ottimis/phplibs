@@ -95,78 +95,23 @@ class Utils
     }
 
     /**
+     * Wrapper deprecato su upsert(): mappa i parametri posizionali storici
+     * ($bInsert, $idfield/$idvalue) sulla firma di upsert(), che resta l'unica
+     * implementazione. Rispetto alle versioni <= 8.0.0 il valore della WHERE
+     * viene escapato e gli identificatori quotati, e vale il supporto
+     * PostgreSQL di upsert().
+     *
      * @deprecated Use upsert instead
      */
     public function dbSql($bInsert, $table, $ar, $idfield = "", $idvalue = "", $noUpdate = false): array
     {
-        $db = $this->dataBase;
-
-        // Filter special keys like "now()" and null
-        $ar = array_map(function ($value) use ($db) {
-            return match ($value) {
-                'now()' => "now()",
-                true => 1,
-                false => 0,
-                null => "NULL",
-                default => "'" . $db->real_escape_string($value) . "'",
-            };
-        }, $ar);
-
-        // Merge quoted $key + "=" + $value
-        $quotedKeys = array_map(fn($k) => $this->quoteIdentifier((string)$k), array_keys($ar));
-        $mergedAr = array();
-        foreach (array_values($ar) as $i => $v) {
-            $mergedAr[] = "{$quotedKeys[$i]}=$v";
-        }
-        $mergedValues = implode(", ", $mergedAr);
-
-        try {
-            if ($mode === UPSERT_MODE::INSERT) {
-                $columns = implode(", ", $quotedKeys);
-                $values = implode(", ", $ar);
-                $sql = "INSERT INTO $table ($columns) VALUES ($values)";
-                if (!$noUpdate) {
-                    if ($isPgsql) {
-                        $conflictCols = implode(", ", array_map(fn($k) => $this->quoteIdentifier($k), $conflictKeys));
-                        // PG ON CONFLICT uses EXCLUDED.column to reference the new values
-                        $excludedAr = array_map(static fn($k) => "$k=EXCLUDED.$k", $quotedKeys);
-                        $sql .= " ON CONFLICT ($conflictCols) DO UPDATE SET " . implode(", ", $excludedAr);
-                    } else {
-                        $sql .= " ON DUPLICATE KEY UPDATE $mergedValues";
-                    }
-                } elseif ($isPgsql) {
-                    $conflictCols = implode(", ", array_map(fn($k) => $this->quoteIdentifier($k), $conflictKeys));
-                    $sql .= " ON CONFLICT ($conflictCols) DO NOTHING";
-                }
-                if ($isPgsql) {
-                    $sql .= " RETURNING id";
-                }
-            } else {
-                $where = implode(" AND ", array_map(function ($v, $k) use ($db) {
-                    return $this->quoteIdentifier((string)$k) . " = '" . $db->real_escape_string($v) . "'";
-                }, $fieldWhere, array_keys($fieldWhere)));
-                $sql = sprintf("UPDATE %s SET %s WHERE %s", $table, $mergedValues, $where);
-            }
-
-            $ret['sql'] = $sql;
-            $r = $db->query($sql);
-
-            if (!$r) {
-                $this->Log->error('Errore inserimento: ' . $db->error() . " Query: " . $sql, "DBSQL");
-                $ret['success'] = 0;
-                $ret['error'] = $db->error();
-            } else {
-                $ret['affectedRows'] = $db->affectedRows();
-                $ret['id'] = $db->insert_id();
-                $ret['success'] = 1;
-            }
-            return $ret;
-        } catch (Exception $e) {
-            $this->Log->error('Eccezione db: ' . $e->getMessage() . " Query: " . $sql, "DBSQL");
-            $ret['success'] = 0;
-            $ret['error'] = $e->getMessage();
-            return $ret;
-        }
+        return $this->upsert(
+            $bInsert ? UPSERT_MODE::INSERT : UPSERT_MODE::UPDATE,
+            (string) $table,
+            $ar,
+            $idfield !== "" && $idfield !== null ? [$idfield => $idvalue] : [],
+            $noUpdate
+        );
     }
 
     public function upsert(UPSERT_MODE $mode, string $table, array $ar, array $fieldWhere = [], $noUpdate = false, array $conflictKeys = ['id']): array
