@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.2.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.3.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -94,6 +94,7 @@ Database:
 
 Logging:
 - `LOG_DRIVER` (db, logstash, aws, gelf, gelf-tcp, local)
+- `LOG_REDACT_KEYS` — chiavi aggiuntive da oscurare nei log (v8.3.0+, vedi `Redactor`)
 - `LOG_SERVICE_NAME`, `GELF_HOST`, `GELF_PORT`
 
 CORS (`RouteController::addGlobalMiddlewares()`, v7.0.1+) — tutte opzionali, default = comportamento storico aperto:
@@ -471,6 +472,7 @@ Handles:
 - 404/405 errors → custom HTML page
 - Other exceptions → logs to Logger, returns 500
 - `?debug=1` query param shows exception message (v8.0.0+: solo se `ERROR_DETAILS_ENABLED=true` E non in produzione — senza flag il debug non funziona nemmeno in locale)
+- Log dell'eccezione (v8.3.0+): `RequestParams` è il body **decodificato e oscurato** via `Redactor::requestBody()` (mai la stringa grezza: se non è JSON/form si loggano solo content-type e lunghezza), `QueryParams` oscurati, `RequestHeaders` solo in allowlist (niente `Authorization`/`Cookie`)
 
 #### serveOpenApi() - Spec OpenAPI (v8.1.0+)
 
@@ -818,6 +820,13 @@ try {
 ### Slim Error Handler
 
 `Utils::slimErrorHandler()` automatically passes the caught exception to Sentry via `Logger::error()`. If Logger itself fails, a direct Sentry fallback captures the exception.
+
+### Redaction (v8.3.0+)
+
+`ottimis\phplibs\Redactor` oscura i dati sensibili **prima** che escano verso un log. È applicato automaticamente a: `$data` di `log()`/`warning()`/`error()` (tutti i driver + context Sentry), log di `slimErrorHandler()`, `before_send` di Sentry (body/query/cookie/header della richiesta allegata, argomenti dei frame, extra e context).
+- Chiavi sensibili: match **case-insensitive, per sottostringa, ignorando `_`/`-`** su `password`, `passwd`, `pwd`, `secret`, `token`, `authorization`, `cookie`, `apikey`, `privatekey`, `credential`, `sessionid`, `cvv` — a qualsiasi profondità. Valore → `[REDACTED]`
+- Chiavi extra per progetto: env `LOG_REDACT_KEYS` (separate da virgola, stessa normalizzazione)
+- API: `Redactor::redact($data)`, `Redactor::requestBody($request)`, `Redactor::requestHeaders($request)` (allowlist), `Redactor::isSensitiveKey($key)`. Usarle anche nei log scritti a mano dai progetti invece di loggare `$request->getBody()`
 
 ---
 

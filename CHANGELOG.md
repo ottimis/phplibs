@@ -1,5 +1,24 @@
 # Changelog
 
+## [8.3.0] - 2026-09-23
+
+### Security
+
+- **I log non contengono più password, token e segreti del body della richiesta.** `Utils::slimErrorHandler()` metteva `RequestParams => $request->getBody()` nel log di ogni eccezione: su login, reset password e cambio password finivano in chiaro in `error_log`, nel driver del Logger e in Sentry password, nuove password e token di reset. Ora:
+  - `RequestParams` è il body decodificato (JSON, form, parsed body multipart con i soli nomi/dimensioni dei file) con le chiavi sensibili oscurate; un body non decodificabile non viene mai loggato grezzo (solo `content_type` e `length`);
+  - `QueryParams` oscurati; nuovo `RequestHeaders` con i soli header in allowlist (`content-type`, `user-agent`, `origin`, …: niente `Authorization`/`Cookie`);
+  - `Logger::log()`/`warning()`/`error()` oscurano `$data` prima di qualsiasi driver e del context Sentry;
+  - Sentry: `before_send` oscura body, query string, header e cookie della richiesta allegata all'evento (il body è allegato di default, `max_request_body_size=medium`), gli argomenti delle funzioni nei frame (catturati quando `zend.exception_ignore_args` è spento, come nell'immagine base) ed extra/context.
+
+### Added
+
+- **`Redactor`** (`ottimis\phplibs\Redactor`): `redact($data)`, `requestBody($request)`, `requestHeaders($request)`, `isSensitiveKey($key)`, `sentryEvent($event)`. Chiavi sensibili per sottostringa, case-insensitive, ignorando `_`/`-` (`password`, `pwd`, `secret`, `token`, `authorization`, `cookie`, `apikey`, `privatekey`, `credential`, `sessionid`, `cvv`), a qualsiasi profondità.
+- **`LOG_REDACT_KEYS`** — env con chiavi aggiuntive da oscurare, separate da virgola.
+
+### Changed
+
+- Il formato di `RequestParams` nel log di `slimErrorHandler()` cambia da stringa grezza ad array (o `null` se il body è vuoto). Chi fa parsing dei log su quel campo va adeguato.
+
 ## [8.2.0] - 2026-08-28
 
 ### Added

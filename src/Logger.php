@@ -96,6 +96,9 @@ class Logger
                     'release' => getenv("SENTRY_RELEASE") ?: null,
                     'traces_sample_rate' => (float)(getenv("SENTRY_TRACES_SAMPLE_RATE") ?: 0.0),
                     'server_name' => gethostname(),
+                    // Oscura body/query/header della richiesta e i context
+                    // prima dell'invio (il body viene allegato di default).
+                    'before_send' => static fn(\Sentry\Event $event): \Sentry\Event => Redactor::sentryEvent($event),
                 ]);
                 \Sentry\configureScope(function (\Sentry\State\Scope $scope): void {
                     $scope->setTag('service', $this->serviceName);
@@ -144,6 +147,7 @@ class Logger
      */
     public function log(string $note, string|null $code = null, $data = array())
     {
+        $data = (array)Redactor::redact($data);
         if ($this->logDriver === "logstash") {
             $this->logstashSend(array_merge([
                 'level' => 'info',
@@ -187,6 +191,7 @@ class Logger
      */
     public function warning(string $note, string|null $code = null, $data = array())
     {
+        $data = (array)Redactor::redact($data);
         $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), JSON_THROW_ON_ERROR);
 
         if ($this->logDriver === "logstash") {
@@ -237,6 +242,7 @@ class Logger
      */
     public function error(string $note, string|null $code = null, $data = array(), ?\Throwable $exception = null)
     {
+        $data = (array)Redactor::redact($data);
         Notify::notify("Logger error", array("note" => $note));
 
         $backtrace = json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), JSON_THROW_ON_ERROR);

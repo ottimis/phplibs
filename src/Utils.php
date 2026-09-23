@@ -1082,9 +1082,14 @@ class Utils
                 "line" => $exception->getLine(),
                 "RequestURI" => $request->getUri()->getPath(),
                 "RequestMethod" => $request->getMethod(),
-                "RequestParams" => $request->getBody(),
-                "QueryParams" => $request->getQueryParams(),
+                // Mai il body grezzo: password, token di reset e segreti finivano
+                // in chiaro nei log. Body decodificato e oscurato (o solo i metadati
+                // se non decodificabile), query oscurata, header in allowlist.
+                "RequestParams" => Redactor::requestBody($request),
+                "QueryParams" => Redactor::redact($request->getQueryParams()),
+                "RequestHeaders" => Redactor::requestHeaders($request),
             ];
+            $debugRequested = !empty($request->getQueryParams()['debug']);
 
             try {
                 $Logger = Logger::getInstance();
@@ -1110,7 +1115,7 @@ class Utils
             // produzione (doppia cintura: il flag distingue gli ambienti
             // non-produzione tra loro, mai riapre la produzione).
             $debugAllowed = Env::flag('ERROR_DETAILS_ENABLED') && !Env::isProduction();
-            if ($debugAllowed && !empty($logData['QueryParams']['debug'])) {
+            if ($debugAllowed && $debugRequested) {
                 $response->getBody()->write($exception->getMessage());
             } else {
                 $response->getBody()->write($errorMessage);
