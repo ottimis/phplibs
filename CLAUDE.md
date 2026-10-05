@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.3.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.4.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -388,7 +388,7 @@ $result = $utils->upsert(UPSERT_MODE::UPDATE, "users",
 | `array` / `object` | JSON encoded string |
 | other | Escaped string |
 
-**Identificatori quotati (v8.0.1+)**: nomi di colonna (chiavi di `$ar`, `$fieldWhere`, `$conflictKeys`) vengono quotati automaticamente — backtick su MySQL, doppi apici su PostgreSQL, anche in forma `alias.colonna` — quindi parole riservate come `key`, `group`, `order`, `rank` funzionano senza intervento. Il nome tabella NON viene quotato (può contenere alias/schema). Su PG il quoting rende il nome case-sensitive: usare colonne minuscole.
+**Nomi di colonna non quotati**: chiavi di `$ar`, `$fieldWhere` e `$conflictKeys` finiscono nella SQL così come sono. Evitare le parole riservate (`key`, `group`, `order`, `rank`…); se proprio servono, passare la chiave già quotata (`` '`rank`' `` su MySQL, `'"rank"'` su PG). Il quoting automatico annunciato nella 8.0.1 non è mai stato attivo ed è stato ritirato nella 8.4.0.
 
 #### Return Value
 
@@ -401,6 +401,29 @@ $result = $utils->upsert(UPSERT_MODE::UPDATE, "users",
     "error" => "..."             // only on error
 ]
 ```
+
+---
+
+### upsertMany() - INSERT di più righe (v8.4.0+)
+
+**Signature**: `upsertMany(string $table, array $rows, bool $noUpdate = false, array $conflictKeys = ['id'], int $chunkSize = 500): array`
+
+Una query per blocco di `$chunkSize` righe invece di una per riga (misurato: ~13-20x più veloce di `upsert()` in loop su 1200 righe). Stesse conversioni dei valori e stessa gestione dei duplicati di `upsert()`: MySQL `ON DUPLICATE KEY UPDATE` (row alias `AS og_new` su MySQL >= 8.0.19, `VALUES(col)` su MariaDB, rilevato in automatico), PG `ON CONFLICT (...) DO UPDATE`; con `$noUpdate` INSERT semplice su MySQL (un duplicato fa fallire il blocco) e `DO NOTHING` su PG.
+
+```php
+$res = $utils->upsertMany('items', [
+    ['code' => '001', 'name' => 'A'],
+    ['code' => '002', 'name' => 'B'],
+], false, ['code']);
+// ['success' => 1, 'affectedRows' => 2, 'id' => 124|null, 'chunks' => 1]
+// su errore: 'success' => 0, 'error', 'failedChunk' (indice del blocco fallito)
+```
+
+- **Tutte le righe con le stesse chiavi** (l'ordine non conta), altrimenti `success: 0` senza query: una colonna mancante andrebbe a DEFAULT e sul ramo update sovrascriverebbe il valore esistente.
+- **Blocchi = query separate**: per l'atomicità avvolgere in `startTransaction()`/`commitTransaction()`. Su errore i blocchi precedenti restano scritti (`affectedRows`/`chunks` dicono quanti).
+- **`id`** = id dell'ultima riga inserita. PG: ultima riga di `RETURNING id`. MySQL: solo con `$noUpdate` e senza colonna `id` esplicita (calcolato da `LAST_INSERT_ID()` + passo `auto_increment_increment`), altrimenti `null`.
+- **PG**: righe con le stesse `$conflictKeys` nella stessa chiamata vengono ridotte all'ultima (`ON CONFLICT DO UPDATE` non accetta due volte la stessa chiave). Su MySQL l'ultima vince nativamente.
+- **MySQL**: `affectedRows` conta 1 per riga inserita e 2 per riga aggiornata. `$chunkSize` limita la dimensione della query (`max_allowed_packet`).
 
 ---
 

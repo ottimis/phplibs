@@ -16,6 +16,7 @@ class Utils
     public DatabaseInterface $dataBase;
     public LoggerPdo|Logger $Log;
     private string $driver;
+    private ?array $mysqlServer = null;
 
     public function __construct($dbName = "default", $singleton = true)
     {
@@ -31,26 +32,6 @@ class Utils
     private function isPgsql(): bool
     {
         return $this->driver === 'pgsql';
-    }
-
-    /**
-     * Quota un identificatore (colonna, eventualmente `tabella.colonna`) con il
-     * delimitatore del driver: backtick su MySQL, doppi apici su PostgreSQL.
-     * Copre tutte le parole riservate (key, group, order, rank, ...) senza
-     * mantenere una lista. Identificatori già quotati o non "semplici"
-     * (espressioni, `*`) vengono lasciati intatti.
-     */
-    private function quoteIdentifier(string $identifier): string
-    {
-        $identifier = trim($identifier);
-        $q = $this->isPgsql() ? '"' : '`';
-        if ($identifier === '' || $identifier === '*' || str_contains($identifier, $q)) {
-            return $identifier;
-        }
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/', $identifier)) {
-            return $identifier;
-        }
-        return implode('.', array_map(static fn($part) => $q . $part . $q, explode('.', $identifier)));
     }
 
     /**
@@ -120,18 +101,7 @@ class Utils
         $isPgsql = $this->isPgsql();
 
         // Filter special keys like "now()" and null
-        $ar = array_map(/**
-         * @throws JsonException
-         */ static function ($value) use ($db) {
-            return match (true) {
-                $value === 'now()' => "now()",
-                $value === true => 1,
-                $value === false => 0,
-                $value === null => "NULL",
-                is_array($value), is_object($value) => "'" . $db->real_escape_string(json_encode($value, JSON_THROW_ON_ERROR)) . "'",
-                default => "'" . $db->real_escape_string($value) . "'",
-            };
-        }, $ar);
+        $ar = array_map($this->sqlValue(...), $ar);
 
         // Merge $key + "=" + $value
         $mergedAr = array();
@@ -187,6 +157,216 @@ class Utils
             $ret['error'] = $e->getMessage();
             return $ret;
         }
+    }
+
+    /**
+     * Literal SQL di un valore, con le conversioni di upsert(): 'now()' → now(),
+     * bool → 1/0, null → NULL, array/object → JSON, altro → stringa escapata.
+     *
+     * @throws JsonException
+     */
+    private function sqlValue(mixed $value): string|int
+    {
+        $db = $this->dataBase;
+        return match (true) {
+            $value === 'now()' => "now()",
+            $value === true => 1,
+            $value === false => 0,
+            $value === null => "NULL",
+            is_array($value), is_object($value) => "'" . $db->real_escape_string(json_encode($value, JSON_THROW_ON_ERROR)) . "'",
+            default => "'" . $db->real_escape_string($value) . "'",
+        };
+    }
+
+    /**
+     * INSERT di più righe con una query per blocco di $chunkSize righe, invece
+     * di una query per riga. Stesse conversioni dei valori e stessa gestione
+     * dei duplicati di upsert(): ON DUPLICATE KEY UPDATE su MySQL/MariaDB,
+     * ON CONFLICT ($conflictKeys) DO UPDATE su PostgreSQL; con $noUpdate
+     * INSERT semplice su MySQL, DO NOTHING su PostgreSQL.
+     *
+     * - Tutte le righe devono avere le stesse chiavi: una colonna mancante
+     *   finirebbe a DEFAULT e, sul ramo update, sovrascriverebbe il valore esistente.
+     * - I blocchi sono query separate: per l'atomicità avvolgere la chiamata in
+     *   startTransaction()/commitTransaction(). Su errore si ferma al blocco
+     *   fallito (failedChunk); quelli precedenti restano scritti.
+     * - 'id' è l'id dell'ultima riga inserita, o null se non è determinabile:
+     *   su MySQL solo con $noUpdate e senza colonna 'id' esplicita (LAST_INSERT_ID
+     *   restituisce il primo id del blocco, l'ultimo si ricava dal passo
+     *   auto_increment_increment); su PostgreSQL dall'ultima riga di RETURNING id.
+     * - PostgreSQL: righe con le stesse $conflictKeys nella stessa chiamata
+     *   vengono ridotte all'ultima (ON CONFLICT DO UPDATE non accetta due volte
+     *   la stessa chiave nello stesso statement).
+     *
+     * @return array{success: int, affectedRows: int, id: int|null, chunks: int, error?: string, failedChunk?: int}
+     */
+    public function upsertMany(string $table, array $rows, bool $noUpdate = false, array $conflictKeys = ['id'], int $chunkSize = 500): array
+    {
+        $ret = ['success' => 1, 'affectedRows' => 0, 'id' => null, 'chunks' => 0];
+        if ($rows === []) {
+            return $ret;
+        }
+
+        $columns = $this->upsertManyColumns($rows, $chunkSize);
+        if (is_string($columns)) {
+            $this->Log->error('upsertMany su ' . $table . ': ' . $columns, "DBSQL");
+            return ['success' => 0, 'error' => $columns] + $ret;
+        }
+
+        $isPgsql = $this->isPgsql();
+        if ($isPgsql && !$noUpdate) {
+            $rows = $this->dedupeByConflictKeys($rows, $columns, $conflictKeys);
+        }
+        $mysql = $isPgsql ? null : $this->mysqlServer();
+        $db = $this->dataBase;
+
+        foreach (array_chunk($rows, $chunkSize) as $i => $chunk) {
+            $sql = '';
+            try {
+                $sql = $this->buildUpsertManySql($table, $columns, $chunk, $noUpdate, $conflictKeys, $mysql['rowAlias'] ?? false);
+                $r = $db->query($sql);
+                $error = $r ? null : $db->error();
+            } catch (Exception $e) {
+                $error = $e->getMessage();
+            }
+            if ($error !== null) {
+                $this->Log->error('Errore upsertMany: ' . $error . " Blocco: $i Query: " . substr($sql, 0, 500), "DBSQL");
+                return ['success' => 0, 'error' => $error, 'failedChunk' => $i] + $ret;
+            }
+
+            $affected = (int)$db->affectedRows();
+            $ret['affectedRows'] += $affected;
+            $ret['chunks']++;
+
+            if ($isPgsql) {
+                if ($affected > 0) {
+                    $last = $db->insert_id();
+                    while ($row = $db->fetchassoc($r)) {
+                        $last = reset($row);
+                    }
+                    $ret['id'] = (int)$last;
+                }
+            } elseif ($noUpdate && !in_array('id', $columns, true) && (int)$db->insert_id() > 0) {
+                $ret['id'] = (int)$db->insert_id() + ($affected - 1) * $mysql['increment'];
+            } else {
+                $ret['id'] = null;
+            }
+        }
+
+        return $ret;
+    }
+
+    /**
+     * Colonne comuni a tutte le righe di upsertMany(), o il messaggio d'errore.
+     */
+    private function upsertManyColumns(array $rows, int $chunkSize): array|string
+    {
+        if ($chunkSize < 1) {
+            return 'chunkSize deve essere >= 1';
+        }
+        $first = reset($rows);
+        if (!is_array($first) || $first === []) {
+            return 'ogni riga deve essere un array associativo non vuoto';
+        }
+        $columns = array_keys($first);
+        foreach ($columns as $c) {
+            if (!is_string($c)) {
+                return 'le chiavi delle righe devono essere nomi di colonna';
+            }
+        }
+        $expected = $columns;
+        sort($expected);
+        foreach ($rows as $i => $row) {
+            if (!is_array($row)) {
+                return "la riga $i non è un array";
+            }
+            $keys = array_keys($row);
+            sort($keys);
+            if ($keys !== $expected) {
+                return "la riga $i ha colonne diverse dalla prima: tutte le righe devono avere le stesse chiavi";
+            }
+        }
+        return $columns;
+    }
+
+    /**
+     * Tiene l'ultima riga per ogni combinazione di $conflictKeys. Le righe con
+     * una chiave NULL non confliggono (NULL è sempre distinto) e restano tutte.
+     */
+    private function dedupeByConflictKeys(array $rows, array $columns, array $conflictKeys): array
+    {
+        if ($conflictKeys === [] || array_diff($conflictKeys, $columns) !== []) {
+            return array_values($rows);
+        }
+        $unique = [];
+        foreach (array_values($rows) as $i => $row) {
+            $parts = [];
+            foreach ($conflictKeys as $k) {
+                if ($row[$k] === null) {
+                    $unique["\0$i"] = $row;
+                    continue 2;
+                }
+                $parts[] = is_scalar($row[$k]) ? (string)(is_bool($row[$k]) ? (int)$row[$k] : $row[$k]) : json_encode($row[$k]);
+            }
+            $unique[implode("\x1F", $parts)] = $row;
+        }
+        return array_values($unique);
+    }
+
+    /**
+     * SQL di un blocco di upsertMany(). Su MySQL >= 8.0.19 il ramo update usa
+     * il row alias (`AS og_new` ... `col = og_new.col`), perché VALUES(col) è
+     * deprecato; MariaDB non supporta il row alias e lì VALUES(col) è corretto.
+     */
+    private function buildUpsertManySql(string $table, array $columns, array $rows, bool $noUpdate, array $conflictKeys, bool $mysqlRowAlias): string
+    {
+        $tuples = array_map(
+            fn(array $row) => '(' . implode(', ', array_map(fn($c) => $this->sqlValue($row[$c]), $columns)) . ')',
+            $rows
+        );
+        $sql = "INSERT INTO $table (" . implode(', ', $columns) . ") VALUES " . implode(', ', $tuples);
+
+        if ($this->isPgsql()) {
+            $sql .= " ON CONFLICT (" . implode(', ', $conflictKeys) . ")";
+            $sql .= $noUpdate
+                ? " DO NOTHING"
+                : " DO UPDATE SET " . implode(', ', array_map(static fn($c) => "$c=EXCLUDED.$c", $columns));
+            return $sql . " RETURNING id";
+        }
+        if ($noUpdate) {
+            return $sql;
+        }
+        if ($mysqlRowAlias) {
+            return $sql . " AS og_new ON DUPLICATE KEY UPDATE " . implode(', ', array_map(static fn($c) => "$c=og_new.$c", $columns));
+        }
+        return $sql . " ON DUPLICATE KEY UPDATE " . implode(', ', array_map(static fn($c) => "$c=VALUES($c)", $columns));
+    }
+
+    /**
+     * Versione e passo auto_increment del server MySQL/MariaDB, letti una
+     * volta per istanza. Se la lettura fallisce si ripiega su VALUES(col),
+     * che funziona ovunque (su MySQL 8 è solo deprecato).
+     *
+     * @return array{rowAlias: bool, increment: int}
+     */
+    private function mysqlServer(): array
+    {
+        if ($this->mysqlServer === null) {
+            $row = null;
+            try {
+                $r = $this->dataBase->query("SELECT VERSION() AS v, @@auto_increment_increment AS inc");
+                $row = $r ? $this->dataBase->fetchassoc($r) : null;
+            } catch (Exception) {
+            }
+            $version = (string)($row['v'] ?? '');
+            $this->mysqlServer = [
+                'rowAlias' => !str_contains(strtolower($version), 'mariadb')
+                    && preg_match('/^(\d+\.\d+\.\d+)/', $version, $m) === 1
+                    && version_compare($m[1], '8.0.19', '>='),
+                'increment' => max(1, (int)($row['inc'] ?? 1)),
+            ];
+        }
+        return $this->mysqlServer;
     }
 
     private function buildWhere($req): array

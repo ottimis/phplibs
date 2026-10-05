@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.4.0] - 2026-10-05
+
+### Added
+
+- **`Utils::upsertMany($table, $rows, $noUpdate = false, $conflictKeys = ['id'], $chunkSize = 500)`** — INSERT di più righe con una query per blocco invece di una per riga (~13-20x più veloce di `upsert()` in loop, misurato su MySQL 8.4, MariaDB 11 e PostgreSQL 17). Stesse conversioni dei valori e stessa gestione dei duplicati di `upsert()`. Su MySQL >= 8.0.19 il ramo update usa il row alias (`AS og_new`, `col = og_new.col`) al posto di `VALUES(col)`, deprecato; su MariaDB resta `VALUES(col)`. Ritorna `success`, `affectedRows`, `id` (ultima riga inserita, `null` se non determinabile), `chunks` e, su errore, `error`/`failedChunk`. Tutte le righe devono avere le stesse chiavi. Su PG le righe con la stessa chiave di conflitto vengono ridotte all'ultima.
+
+### Removed
+
+- **Quoting automatico dei nomi di colonna in `upsert()`, annunciato nella 8.0.1: non è mai stato attivo.** La modifica della 8.0.1 era finita nel corpo di `dbSql()` (allora una copia di `upsert()`, e rotta dalla stessa modifica), e quel corpo è stato sostituito nella 8.2.1. `upsert()` ha sempre passato i nomi di colonna così come sono, e così resta: nessun cambiamento di comportamento. Rimosso il metodo privato inutilizzato `quoteIdentifier()`. Per una colonna con nome riservato, passare la chiave già quotata.
+
 ## [8.3.0] - 2026-09-23
 
 ### Security
