@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.4.1] - 2026-10-08
+
+### Fixed
+
+- **`#[Validator(type: VALIDATOR_TYPE::FLOAT)]` rifiutava qualsiasi valore.** Il controllo faceva `settype($value, 'float')` e poi confrontava `gettype($value)` con `'float'`, ma PHP riporta i float come `"double"`: il confronto falliva sempre, anche per `1.2` o `"1.2"`. Ora `FLOAT` ha un controllo dedicato che verifica il valore originale prima di convertirlo:
+  - accetta numeri JSON (`1.2`, `5`) e stringhe numeriche col punto (`"1.2"`, `"1e3"`) **o con la virgola decimale** (`"1,2"`, `"-0,5"`, `",5"`); in `validatedBody` arriva un `float`;
+  - rifiuta stringhe non numeriche (`"abc"`, `"12abc"`), separatori delle migliaia (`"1.234,56"`, ambiguo), `INF`/`NAN`, booleani e array, senza mai troncarli (prima `"1,2"` sarebbe diventato `1.0`);
+  - la virgola è sempre decimale: `"1,234"` vale `1.234`, non `1234`;
+  - `min`/`max` lavorano sul valore convertito.
+
+  Gli altri tipi (`INTEGER`, `BOOLEAN`, …) restano invariati.
+
 ## [8.4.0] - 2026-10-05
 
 ### Added

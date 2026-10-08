@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.4.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.4.1) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -974,6 +974,7 @@ o togliere lo schema.
 - `UPSERT_MODE::INSERT` / `UPSERT_MODE::UPDATE`
 - `STATUS::ACTIVE` (1) / `STATUS::CANCELLED` (2)
 - `VALIDATOR_TYPE::STRING`, `INTEGER`, `FLOAT`, `BOOLEAN`, `ARRAY`
+- `FLOAT` (v8.4.1+): accetta numero JSON o stringa col punto **o con la virgola decimale** (`"1,2"` → `1.2` float in `validatedBody`); rifiuta separatori delle migliaia (`"1.234,56"`) e stringhe non numeriche, mai troncate. `"1,234"` vale `1.234`
 - `VALIDATOR_FORMAT::DATE`, `DATE_TIME`, `EMAIL`
 
 ---

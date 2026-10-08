@@ -81,10 +81,18 @@ class Validator
                 'message' => 'Value is not a valid datetime',
             ];
         }
-        if ($this->type !== null)   {
+        if ($this->type === VALIDATOR_TYPE::FLOAT) {
+            $value = self::toFloat($value);
+            if ($value === null) {
+                return [
+                    'success' => false,
+                    'message' => 'Value is not of type float',
+                ];
+            }
+        } elseif ($this->type !== null) {
             settype($value, $this->type->value);
         }
-        if ($this->type !== null && gettype($value) !== $this->type->value) {
+        if ($this->type !== null && $this->type !== VALIDATOR_TYPE::FLOAT && gettype($value) !== $this->type->value) {
             return [
                 'success' => false,
                 'message' => 'Value is not of type ' . $this->type->value,
@@ -128,5 +136,24 @@ class Validator
             'success' => true,
             'value' => $value,
         ];
+    }
+
+    // Accetta numeri JSON e stringhe numeriche col punto o con la virgola
+    // decimale ("1,2" → 1.2). Niente separatori delle migliaia: "1.234,56" è
+    // rifiutato, "1,234" vale 1.234. Mai troncare: null se non è un float.
+    private static function toFloat(mixed $value): ?float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float)$value;
+        }
+        if (!is_string($value)) {
+            return null;
+        }
+        $value = trim($value);
+        if (preg_match('/^[+-]?\d*,\d+$/', $value)) {
+            $value = str_replace(',', '.', $value);
+        }
+        $float = filter_var($value, FILTER_VALIDATE_FLOAT);
+        return $float === false ? null : $float;
     }
 }
