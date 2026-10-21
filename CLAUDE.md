@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.4.1) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v8.4.3) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -790,7 +790,7 @@ class OrderController extends RouteController
 
 **Driver `gelf`/`gelf-tcp`**: Invia a Graylog con:
 - Messaggio: `$note`
-- Additional fields: `$data` + `stacktrace`
+- Additional fields: `$data` + `stacktrace`. Chiavi non ammesse da GELF rinominate, mai scartate (v8.4.3+): `id` → `ctx_id`, caratteri fuori da `[\w.-]` → `_`, chiavi intere `0` → `ctx_0`
 - Tag: `service_name` (configurabile via `LOG_TAG_NAME`)
 
 **Driver `aws`**: Invia a CloudWatch con:

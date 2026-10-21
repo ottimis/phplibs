@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.4.3] - 2026-10-21
+
+### Fixed
+
+- **Con `LOG_DRIVER=gelf`/`gelf-tcp` le eccezioni non gestite non arrivavano mai a Graylog.** `Utils::slimErrorHandler()` loggava `$data` con la chiave `id`, che il driver gelf passa a gelf-php come campo aggiuntivo `_id`: la spec GELF lo vieta, `MessageValidator` rifiuta il messaggio e `Publisher` lancia `RuntimeException("Message is invalid: additional field 'id' is not allowed")`. Il catch dell'handler notificava "Error in logging" e l'eccezione spariva da Graylog. Due correzioni:
+  - `slimErrorHandler()` usa la chiave **`errorId`** al posto di `id` (stesso valore `uniqid()`, ancora nel messaggio `Exception <errorId> Message: ...`);
+  - `Logger::log()`/`warning()`/`error()` con driver `gelf`/`gelf-tcp` rendono valide le chiavi di `$data` prima di passarle a gelf-php, rinominandole invece di scartarle: `id` → `ctx_id`, caratteri fuori da `[\w.-]` (rifiutati dalla validazione GELF 1.1) → `_`, chiave vuota → `ctx_`, chiavi intere di un array lista (che facevano fallire `setAdditional(string)` con `TypeError`) → `ctx_0`, `ctx_1`, … In caso di collisione con una chiave esistente si antepone altro `ctx_`. La rinomina avviene dopo `Redactor::redact()`, che continua a lavorare sui nomi originali. Gli altri driver non cambiano.
+
+### Changed
+
+- Nel log di `slimErrorHandler()` il campo `id` diventa `errorId`, per tutti i driver (anche `error_log`, logstash, aws, Sentry `extra_data`). Chi cerca o fa parsing dei log su quel campo va adeguato.
+
 ## [8.4.1] - 2026-10-08
 
 ### Fixed

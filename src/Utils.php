@@ -1256,7 +1256,8 @@ class Utils
             }
 
             $logData = [
-                "id" => uniqid('', false),
+                // Non "id": è un campo riservato GELF e Graylog rifiuterebbe il messaggio.
+                "errorId" => uniqid('', false),
                 "message" => $exception->getMessage(),
                 "file" => $exception->getFile(),
                 "line" => $exception->getLine(),
@@ -1273,7 +1274,7 @@ class Utils
 
             try {
                 $Logger = Logger::getInstance();
-                $Logger->error("Exception " . $logData['id'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData, $exception);
+                $Logger->error("Exception " . $logData['errorId'] . " Message: " . $logData['message'], "SLIM_ERROR", $logData, $exception);
             } catch (Exception $e) {
                 Notify::notify("Error in logging: " . $e->getMessage());
                 error_log("Error in logging: " . $e->getMessage());

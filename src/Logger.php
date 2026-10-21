@@ -161,7 +161,7 @@ class Logger
                 'note' => $note,
             ], $data));
         } else if ($this->logDriver === "gelf" || $this->logDriver === "gelf-tcp") {
-            $this->GelfLogger->info($note, $data);
+            $this->GelfLogger->info($note, self::gelfContext($data));
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
@@ -209,8 +209,9 @@ class Logger
                 'stacktrace' => $backtrace,
             ], $data));
         } else if ($this->logDriver === "gelf" || $this->logDriver === "gelf-tcp") {
-            $data['stacktrace'] = $backtrace;
-            $this->GelfLogger->warning($note, $data);
+            $context = self::gelfContext($data);
+            $context['stacktrace'] = $backtrace;
+            $this->GelfLogger->warning($note, $context);
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
@@ -262,8 +263,9 @@ class Logger
                 'stacktrace' => $backtrace,
             ], $data));
         } else if ($this->logDriver === "gelf" || $this->logDriver === "gelf-tcp") {
-            $data['stacktrace'] = $backtrace;
-            $this->GelfLogger->error($note, $data);
+            $context = self::gelfContext($data);
+            $context['stacktrace'] = $backtrace;
+            $this->GelfLogger->error($note, $context);
         } else if ($this->logDriver === "db") {
             $db = new dataBase();
             $sql = sprintf(
@@ -432,6 +434,38 @@ class Logger
                     ->withHeader('Content-Type', 'text/html');
             });
         })->add($secureMW);
+    }
+
+    /**
+     * Rende le chiavi di $data accettabili come campi aggiuntivi GELF.
+     *
+     * Il Publisher di gelf-php valida ogni messaggio e lo rifiuta interamente
+     * (RuntimeException "Message is invalid") se un campo aggiuntivo si chiama
+     * `id` (riservato dalla spec) o contiene caratteri fuori da [\w.-]. Una
+     * chiave intera (array lista) fa invece fallire setAdditional(string).
+     * Le chiavi vengono quindi rinominate, mai scartate: `id` → `ctx_id`,
+     * caratteri non ammessi → `_`, chiave vuota → `ctx_`, chiave intera
+     * `0` → `ctx_0` (PHP riconverte la stringa `'0'` in intero). In caso di
+     * collisione con una chiave esistente si antepone altro `ctx_`.
+     * Da chiamare dopo Redactor::redact(): l'oscuramento lavora sui nomi originali.
+     */
+    private static function gelfContext(array $data): array
+    {
+        $context = [];
+        foreach ($data as $key => $value) {
+            $safe = preg_replace('/[^\w.\-]/', '_', (string)$key);
+            if ($safe === '' || $safe === 'id' || is_int(array_key_first([$safe => 0]))) {
+                $safe = 'ctx_' . $safe;
+            }
+            if ($safe !== (string)$key) {
+                while (array_key_exists($safe, $data) || array_key_exists($safe, $context)) {
+                    $safe = 'ctx_' . $safe;
+                }
+            }
+            $context[$safe] = $value;
+        }
+
+        return $context;
     }
 
     /**
