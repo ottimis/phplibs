@@ -294,6 +294,8 @@ sendPHPMailer(): OGResponse                            // Send using PHPMailer
 sendAWS(): OGResponse                                  // Send using AWS SES
 ```
 
+> **v9.0.0+ — MailGuard**: outside production (`ENV` not `production`/`prod`, or unset) every send is redirected to `MAIL_REDIRECT_TO` (comma separated) with the original recipients shown in subject, body banner and `X-Original-To`; without `MAIL_REDIRECT_TO` nothing is sent (`success: true`, one warning log). `MAIL_GUARD_DISABLED=true` opts out. Custom mailers must call `MailGuard::route()`.
+
 #### Usage Example:
 
 ```php

@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v8.4.3) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v9.0.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -60,7 +60,7 @@ while ($row = $db->fetchassoc($res1)) {
 - **`Validator`** - PHP attribute for property validation
 - **`Logger`** - Multi-driver logging (db, logstash, AWS CloudWatch, GELF/Graylog)
 - **`Auth`** - JWT authentication with Firebase JWT library
-- **`OGMail`** - Email via SMTP (PHPMailer) or AWS SES
+- **`OGMail`** - Email via SMTP (PHPMailer) or AWS SES. v9.0.0+: ogni invio passa da `MailGuard` (vedi sezione OGMail / MailGuard)
 
 ### Environment Variables
 
@@ -91,6 +91,10 @@ Database:
 - `DB_TIMEZONE` / `DB_TIMEZONE_{name}` — override DB del timezone di sessione (v8.2.0+); senza di essi vale `TIMEZONE` (vedi sezione Ambiente). Non impostato nulla = default del server. Un timezone rifiutato dal server è un errore fatale alla connessione, non un warning
 - `SQL_MODE` / `SQL_MODE_LEGACY` — `sql_mode` di sessione (solo MySQL); `SQL_MODE_LEGACY=true` azzera il sql_mode
 - Multi-db: `DB_HOST_{name}`, `DB_USER_{name}`, etc.
+
+Mail (`MailGuard`, v9.0.0+) — fuori produzione nessuna mail raggiunge i destinatari reali:
+- `MAIL_REDIRECT_TO` — indirizzi (virgola) su cui dirottare ogni mail fuori produzione; senza indirizzi validi la mail non parte (fail-closed). Ignorata in produzione
+- `MAIL_GUARD_DISABLED` — `true` spegne la guard fuori produzione (invio reale ai destinatari): scelta consapevole, solo per progetti che devono davvero inviare da staging
 
 Logging:
 - `LOG_DRIVER` (db, logstash, aws, gelf, gelf-tcp, local)
@@ -976,6 +980,33 @@ o togliere lo schema.
 - `VALIDATOR_TYPE::STRING`, `INTEGER`, `FLOAT`, `BOOLEAN`, `ARRAY`
 - `FLOAT` (v8.4.1+): accetta numero JSON o stringa col punto **o con la virgola decimale** (`"1,2"` → `1.2` float in `validatedBody`); rifiuta separatori delle migliaia (`"1.234,56"`) e stringhe non numeriche, mai troncate. `"1,234"` vale `1.234`
 - `VALIDATOR_FORMAT::DATE`, `DATE_TIME`, `EMAIL`
+
+---
+
+## OGMail / MailGuard (v9.0.0+)
+
+**Cambio di comportamento (major)**: fuori produzione OGMail non invia più ai destinatari reali. In produzione serve `ENV=production` (o `prod`): ambiente non impostato o diverso = non produzione = guard attiva, e senza `MAIL_REDIRECT_TO` **nessuna mail parte**.
+
+| Ambiente | Effetto |
+|---|---|
+| `Env::isProduction()` o `MAIL_GUARD_DISABLED=true` | destinatari, oggetto e corpo invariati (`MAIL_REDIRECT_TO` ignorata) |
+| non prod + `MAIL_REDIRECT_TO` valida | To = solo gli indirizzi di redirect, Cc/Bcc svuotati; oggetto `[TEST → a@x, b@x, c@x, +N] …` (max 3 indirizzi); banner in testa a html e testo con TUTTI i destinatari originali; header `X-Original-To` |
+| non prod senza redirect valido | nessun invio, `success: true`, una riga `warning` (code `MAIL_GUARD_BLOCKED`, payload via `Redactor`) |
+
+- In OGMail la guard si applica in `send()` (dopo le validazioni del contenuto, **prima** dei controlli di trasporto: una mail bloccata non richiede `SMTP_HOST`), `sendPHPMailer()` e `sendAWS()`; una sola volta per invio. Lo stato dell'oggetto non cambia: `send()` due volte dà lo stesso risultato. Reply-To, CID e allegati invariati.
+- **Test senza rete**: sottoclassare OGMail e sovrascrivere `protected function deliver(array $envelope, string $channel): OGResponse` — riceve la busta effettiva (`to`, `cc`, `bcc`, `subject`, `html`, `text`, `headers`) e il canale (`smtp`/`ses`) al posto del trasporto.
+- **Mailer custom** (es. Microsoft Graph) che non passano da OGMail DEVONO chiamare la guard, altrimenti la saltano:
+
+```php
+$route = MailGuard::route($to, $cc, $bcc, $subject, 'graph'); // null = non inviare (tratta come riuscito)
+if ($route === null) { return; }
+$html = MailGuard::htmlBanner($route) . $html;   // '' se non dirottata
+$text = MailGuard::textBanner($route) . $text;   // '' se non dirottata
+$headers = MailGuard::headers($route);           // ['X-Original-To' => ...] o []
+// usare $route['to'] / ['cc'] / ['bcc'] / ['subject']
+```
+
+`MailGuard::setLogger(?callable)` serve solo ai test (intercetta la riga di log del blocco). Test: `php tests/MailGuardTest.php`.
 
 ---
 

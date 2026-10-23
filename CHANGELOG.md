@@ -1,5 +1,22 @@
 # Changelog
 
+## [9.0.0] - 2026-10-23
+
+### ⚠️ Breaking — cambio di comportamento di OGMail
+
+- **Fuori produzione OGMail non invia più ai destinatari reali.** Senza `MAIL_REDIRECT_TO` (o `MAIL_GUARD_DISABLED=true`) nessuna mail parte: `send()` ritorna `success: true` e scrive una riga `warning` (code `MAIL_GUARD_BLOCKED`).
+- **In produzione serve `ENV=production` (o `prod`, oppure `ENVIRONMENT` come fallback).** Ambiente non impostato o con un altro nome = non produzione: senza `MAIL_REDIRECT_TO` nessuna mail parte. Verificare la variabile su ogni deploy di produzione prima di aggiornare.
+- Una `send()` bloccata non richiede più `SMTP_HOST` (la guard viene prima dei controlli di trasporto).
+- `send()` non scrive più il fallback `strip_tags()` nel testo dell'oggetto (`mailText`): il fallback è calcolato a ogni invio.
+
+### Added
+
+- **`ottimis\phplibs\MailGuard`** (solo metodi statici): `route($to, $cc, $bcc, $subject, $channel): ?array`, `htmlBanner($route)`, `textBanner($route)`, `headers($route)`, `setLogger(?callable)` (test). Fuori produzione con `MAIL_REDIRECT_TO` (indirizzi validati e deduplicati) la mail va solo a quegli indirizzi, Cc/Bcc svuotati, oggetto prefissato `[TEST → a@x.com, b@x.com, c@x.com, +N] ` (max 3 indirizzi, CR/LF rimossi), banner rosso in testa all'html e banner testo con tutti i destinatari originali, header `X-Original-To`. Senza redirect valido: fail-closed (`null`), log via `Logger::warning()` con payload passato da `Redactor`. Da usare anche nei mailer di progetto che non passano da OGMail (es. Microsoft Graph).
+- OGMail applica la guard in `send()`, `sendPHPMailer()` e `sendAWS()` (una volta per invio, senza modificare lo stato dell'oggetto: `send()` due volte dà lo stesso risultato). `X-Original-To` aggiunto via `addCustomHeader()` (PHPMailer) o negli header MIME raw sanificati (SES). Reply-To, CID e allegati invariati.
+- Punto di estensione `protected OGMail::deliver(array $envelope, string $channel): OGResponse`: una sottoclasse riceve la busta effettiva (`to`, `cc`, `bcc`, `subject`, `html`, `text`, `headers`) al posto del trasporto, per testare il dirottamento senza rete.
+- Variabili `MAIL_REDIRECT_TO`, `MAIL_GUARD_DISABLED` (letta con `Env::flag()`; spegnerla fuori produzione è una scelta consapevole del progetto).
+- Test: `php tests/MailGuardTest.php`.
+
 ## [8.4.3] - 2026-10-21
 
 ### Fixed

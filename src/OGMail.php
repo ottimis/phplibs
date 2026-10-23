@@ -17,6 +17,9 @@ use Smarty\Exception as SmartyException;
 
 class OGMail
 {
+    protected const string CHANNEL_SMTP = 'smtp';
+    protected const string CHANNEL_SES = 'ses';
+
     protected Logger $Logger;
     private SesV2Client $SESClient;
     private string $mailFrom;
@@ -190,24 +193,95 @@ class OGMail
         if (empty($this->rcpt)) {
             throw new RuntimeException("Mail recipient is required");
         }
-        if (empty($this->mailText)) {
-            $this->mailText = strip_tags($this->mailHtml);
+
+        // La guard viene prima dei controlli di trasporto: una mail bloccata
+        // fuori produzione non richiede SMTP_HOST né tocca PHPMailer/SES.
+        $channel = getenv("SMTP_TYPE") === "aws" ? self::CHANNEL_SES : self::CHANNEL_SMTP;
+        $envelope = $this->guardedEnvelope($channel);
+        if ($envelope === null) {
+            return new OGResponse(success: true);
         }
 
-        if (getenv("SMTP_TYPE") === "aws") {
-            return $this->sendAWS();
-        }
-
-        if (empty(getenv("SMTP_HOST"))) {
+        if ($channel === self::CHANNEL_SMTP && empty(getenv("SMTP_HOST"))) {
             throw new RuntimeException("SMTP_HOST is required");
         }
-        return $this->sendPHPMailer();
+        return $this->deliver($envelope, $channel);
+    }
+
+    /**
+     * Invio diretto via PHPMailer. Passa comunque dalla MailGuard.
+     *
+     * @throws Exception
+     */
+    public function sendPHPMailer(): OGResponse
+    {
+        $envelope = $this->guardedEnvelope(self::CHANNEL_SMTP);
+        if ($envelope === null) {
+            return new OGResponse(success: true);
+        }
+        return $this->deliver($envelope, self::CHANNEL_SMTP);
+    }
+
+    /**
+     * Invio diretto via AWS SES. Passa comunque dalla MailGuard.
+     *
+     * @throws Exception
+     */
+    public function sendAWS(): OGResponse
+    {
+        $envelope = $this->guardedEnvelope(self::CHANNEL_SES);
+        if ($envelope === null) {
+            return new OGResponse(success: true);
+        }
+        return $this->deliver($envelope, self::CHANNEL_SES);
+    }
+
+    /**
+     * Busta effettiva dopo la MailGuard, calcolata senza toccare lo stato dell'oggetto
+     * (chiamare send() due volte dà lo stesso risultato). null = invio bloccato.
+     *
+     * @return array{to:string[],cc:string[],bcc:string[],subject:string,html:string,text:string,headers:array<string,string>}|null
+     */
+    private function guardedEnvelope(string $channel): ?array
+    {
+        $html = $this->mailHtml ?? '';
+        $route = MailGuard::route($this->rcpt, $this->cc, $this->bcc, $this->mailSubject ?? '', $channel);
+        if ($route === null) {
+            return null;
+        }
+        $text = !empty($this->mailText) ? $this->mailText : strip_tags($html);
+
+        return [
+            'to' => $route['to'],
+            'cc' => $route['cc'],
+            'bcc' => $route['bcc'],
+            'subject' => $route['subject'],
+            'html' => MailGuard::htmlBanner($route) . $html,
+            'text' => MailGuard::textBanner($route) . $text,
+            'headers' => MailGuard::headers($route),
+        ];
+    }
+
+    /**
+     * Consegna della busta già passata dalla MailGuard. Punto di estensione: una
+     * sottoclasse può sovrascriverlo per intercettare la busta effettiva al posto
+     * del trasporto (test senza rete, anche nei progetti).
+     *
+     * @param array{to:string[],cc:string[],bcc:string[],subject:string,html:string,text:string,headers:array<string,string>} $envelope
+     * @param string $channel self::CHANNEL_SMTP | self::CHANNEL_SES
+     * @throws Exception
+     */
+    protected function deliver(array $envelope, string $channel): OGResponse
+    {
+        return $channel === self::CHANNEL_SES
+            ? $this->transportAWS($envelope)
+            : $this->transportPHPMailer($envelope);
     }
 
     /**
      * @throws Exception
      */
-    public function sendPHPMailer(): OGResponse
+    private function transportPHPMailer(array $envelope): OGResponse
     {
         $mail = new PHPMailer();
         $mail->Host = getenv("SMTP_HOST");
@@ -228,17 +302,20 @@ class OGMail
         $mail->WordWrap = 50;
         $mail->isHTML();
 
-        foreach ($this->rcpt as $rcpt) {
+        foreach ($envelope['to'] as $rcpt) {
             $mail->addAddress($rcpt);
         }
         foreach ($this->replyTo as $rt) {
             $mail->AddReplyTo($rt);
         }
-        foreach ($this->cc as $cc) {
+        foreach ($envelope['cc'] as $cc) {
             $mail->addCC($cc);
         }
-        foreach ($this->bcc as $bcc) {
+        foreach ($envelope['bcc'] as $bcc) {
             $mail->addBCC($bcc);
+        }
+        foreach ($envelope['headers'] as $name => $value) {
+            $mail->addCustomHeader($name, $value);
         }
 
         foreach ($this->cids as $cid) {
@@ -252,9 +329,9 @@ class OGMail
         }
 
         // Set email format to HTML
-        $mail->Subject = $this->mailSubject;
-        $mail->Body = $this->mailHtml;
-        $mail->AltBody = $this->mailText;
+        $mail->Subject = $envelope['subject'];
+        $mail->Body = $envelope['html'];
+        $mail->AltBody = $envelope['text'];
 
         try {
             if ($mail->send()) {
@@ -289,7 +366,7 @@ class OGMail
     /**
      * @throws Exception
      */
-    public function sendAWS(): OGResponse
+    private function transportAWS(array $envelope): OGResponse
     {
         // New lines are required for the MIME boundary!!! Do not remove them!
         $boundary = uniqid(mt_rand(), true);
@@ -300,9 +377,14 @@ class OGMail
             'Content-Type: ' . $topContentType . '; boundary="' . $boundary . '"',
             'Content-Transfer-Encoding: 7bit',
             // RFC 2047: il base64 neutralizza CRLF injection e gestisce i subject UTF-8
-            'Subject: =?UTF-8?B?' . base64_encode($this->mailSubject) . '?=',
+            'Subject: =?UTF-8?B?' . base64_encode($envelope['subject']) . '?=',
         ];
+        foreach ($envelope['headers'] as $name => $value) {
+            $mime_headers[] = self::sanitizeMimeValue($name) . ': ' . self::sanitizeMimeValue($value);
+        }
         $charset = 'UTF-8';
+        $mailText = $envelope['text'];
+        $mailHtml = $envelope['html'];
 
         $html_body = <<<EOT
         --$boundary
@@ -311,12 +393,12 @@ class OGMail
         --$alternativeBoundary
         Content-Type: text/plain; charset="$charset"
         
-        $this->mailText
+        $mailText
         
         --$alternativeBoundary
         Content-Type: text/html; charset=$charset
         
-        $this->mailHtml
+        $mailHtml
         
         --$alternativeBoundary--
 
@@ -375,15 +457,15 @@ class OGMail
             'FromEmailAddress' => ($this->mailFromName ?? getenv("SMTP_FROM_NAME"))." <".($this->mailFrom ?? getenv("SMTP_FROM")).">",
             'ReplyToAddresses' => [],
         ];
-        $data['Destination']['ToAddresses'] = $this->rcpt;
+        $data['Destination']['ToAddresses'] = $envelope['to'];
         if (!empty($this->replyTo)) {
             $data['ReplyToAddresses'] = $this->replyTo;
         }
-        if (!empty($this->cc)) {
-            $data['Destination']['CcAddresses'] = $this->cc;
+        if (!empty($envelope['cc'])) {
+            $data['Destination']['CcAddresses'] = $envelope['cc'];
         }
-        if (!empty($this->bcc)) {
-            $data['Destination']['BccAddresses'] = $this->bcc;
+        if (!empty($envelope['bcc'])) {
+            $data['Destination']['BccAddresses'] = $envelope['bcc'];
         }
 
         try {
