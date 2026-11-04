@@ -8,7 +8,7 @@ Dopo modifiche funzionali o sostanziali (nuovi metodi, cambio firma, deprecazion
 
 ## Project Overview
 
-**ottimis/phplibs** is a PHP library (v9.0.0) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
+**ottimis/phplibs** is a PHP library (v9.0.1) providing tools for building RESTful APIs with Slim Framework. It includes database abstraction (MySQL + PostgreSQL), routing, validation, logging, email, HTTP utilities, and pgvector support.
 
 - **Namespace**: `ottimis\phplibs`
 - **PHP Version**: 8.4+
@@ -1142,6 +1142,8 @@ $cache->ttl('key');                          // int (-1 no scadenza, -2 non esis
 $cache->raw();                               // OGCache con prefix vuoto (chiavi globali)
 $cache->getRedis();                          // \Redis instance
 ```
+
+> **`clear()` (v8.4.4 / v9.0.1+)**: scorre il cursore SCAN fino in fondo. Prima si fermava al primo blocco senza chiavi corrispondenti (`SCAN_NORETRY` di phpredis restituisce `false` anche a scansione non finita): su Redis condivisi con molte chiavi l'invalidazione per pattern non cancellava nulla, mentre in locale/staging sembrava funzionare. Test: `php tests/OGCacheClearTest.php` (serve un Redis, DB `REDIS_DATABASE` default 15).
 
 > **Tipi (v8.0.1+)**: la serializzazione JSON usa `JSON_PRESERVE_ZERO_FRACTION`, quindi un `float` come `19.0` torna `float` dalla cache (prima diventava `int`). Un `int` resta `int` e una stringa `"19.00"` resta stringa: il tipo restituito è quello passato a `set()`/calcolato in `remember()`.
 

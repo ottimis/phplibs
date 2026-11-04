@@ -145,7 +145,12 @@ class OGCache
      * Delete all keys matching a glob-style pattern.
      * Example: clear('product_*') deletes product_list, product_42, etc.
      *
-     * Uses SCAN internally to avoid blocking the server.
+     * Uses SCAN internally to avoid blocking the server. The scan runs until
+     * the cursor returns to 0: with phpredis' default SCAN_NORETRY mode a
+     * single SCAN step may legitimately return no matching keys (false) while
+     * the iteration is not finished yet, so an empty batch must NOT stop the
+     * loop. Stopping there deleted nothing on large databases where the first
+     * batch rarely contains a match.
      */
     public function clear(string $pattern = '*'): int
     {
@@ -153,9 +158,12 @@ class OGCache
         $deleted = 0;
         $iterator = null;
 
-        while ($keys = $this->redis->scan($iterator, $fullPattern, 100)) {
-            $deleted += $this->redis->del($keys);
-        }
+        do {
+            $keys = $this->redis->scan($iterator, $fullPattern, 1000);
+            if ($keys !== false && $keys !== []) {
+                $deleted += (int)$this->redis->del($keys);
+            }
+        } while ($iterator > 0);
 
         return $deleted;
     }
